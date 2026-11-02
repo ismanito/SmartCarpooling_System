@@ -1,0 +1,14 @@
+{
+  "name": "ridemate",
+  "private": true,
+  "description": "RideMate monorepo – carpool matching for verified university students",
+  "scripts": {
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "emulators": "firebase emulators:start --only auth --project demo-ridemate",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "dev": "concurrently -n auth,api,web -c yellow,cyan,magenta \"npm run emulators\" \"npm run dev:server\" \"npm run dev:client\"",
+    "test": "npm --prefix server test && npm --prefix client test"
+  }
+}

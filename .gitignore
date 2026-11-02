@@ -1,0 +1,29 @@
+# dependencies
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+
+# build output
+dist/
+coverage/
+.pytest_cache/
+
+# secrets – only .env.example files are committed
+.env
+.env.*
+!.env.example
+*-service-account*.json
+serviceAccount*.json
+
+# firebase emulator
+firebase-debug.log
+*-debug.log
+.firebase/
+
+# editors / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db

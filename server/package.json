@@ -1,0 +1,35 @@
+{
+  "name": "ridemate-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "RideMate REST API",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "migrate": "node scripts/migrate.js",
+    "migrate:test": "node scripts/migrate.js --test",
+    "seed": "node scripts/seed.js",
+    "make-admin": "node scripts/make-admin.js",
+    "test": "jest --runInBand",
+    "test:unit": "jest --config jest.unit.config.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.9",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.3",
+    "firebase-admin": "^14.5.0",
+    "helmet": "^8.3.0",
+    "pg": "^8.23.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "jest": "^30.5.2",
+    "supertest": "^7.3.1"
+  }
+}

@@ -1,0 +1,23 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: ridemate-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ridemate
+      POSTGRES_PASSWORD: ridemate
+      POSTGRES_DB: ridemate
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Mounted as a single file so the image's own PostGIS init script still runs.
+      - ./db/init/20_ridemate.sql:/docker-entrypoint-initdb.d/20_ridemate.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ridemate -d ridemate"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@theme {
+  /* Neutral paper ground, Stormy Teal ink/chrome, Gold labels on teal, Coral/Mint for state only */
+  --color-paper: #f1f6f4;
+  --color-paper-deep: #e6eeeb;
+  --color-surface: #ffffff;
+  --color-ink: #156064;
+  --color-ink-deep: #0f4a4d;
+  --color-gold: #f8e16c;
+  --color-coral: #fb8f67;
+  --color-mint: #01c49a;
+  --color-error: #a8381b;
+
+  --font-display: "Teko", "Arial Narrow", sans-serif;
+  --font-sans: "Heebo", system-ui, sans-serif;
+
+  --radius-control: 8px;
+  --radius-panel: 12px;
+  --radius-chip: 4px;
+
+  --shadow-contact: 0 1px 0 rgb(21 96 100 / 0.1), 0 2px 4px -2px rgb(21 96 100 / 0.14);
+}
+
+@layer base {
+  html {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    min-height: 100dvh;
+    overflow-x: clip;
+  }
+  ::selection {
+    background-color: var(--color-gold);
+    color: var(--color-ink);
+  }
+}
+
+/* Graph-paper stipple – only under plate / seat registration regions. */
+@utility bg-stipple {
+  background-image: radial-gradient(rgb(21 96 100 / 0.16) 1px, transparent 1px);
+  background-size: 8px 8px;
+  background-position: 4px 4px;
+}
+
+/* 10px diagonal cut on the top-right corner of the status pane. */
+@utility clip-corner {
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+}
+
+/* Uppercase tracked metadata – plates, domains, specs. */
+@utility text-spec {
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+@utility focus-ring {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  &:focus-visible {
+    outline-color: var(--color-mint);
+  }
+}
