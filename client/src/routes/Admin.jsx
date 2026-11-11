@@ -219,6 +219,7 @@ function People({ myId }) {
                   {u.fullName} <Rating value={u.avgRating} />
                   {u.role === 'admin' && <span className="rounded-(--radius-chip) bg-ink px-1.5 text-xs text-gold">Admin</span>}
                   {u.role === 'driver' && <span className="rounded-(--radius-chip) border border-ink px-1.5 text-xs">Driver</span>}
+                  {u.role === 'student' && u.personType === 'staff' && <span className="rounded-(--radius-chip) border border-ink px-1.5 text-xs">Staff</span>}
                   {u.status === 'suspended' && <span className="rounded-(--radius-chip) bg-error px-1.5 text-xs text-surface">Suspended</span>}
                 </p>
                 <p className="text-sm text-ink/85">

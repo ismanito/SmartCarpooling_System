@@ -22,6 +22,9 @@ router.use(requireAuth(), requireRole('student', 'driver')); // admins are staff
 // Only students ask for rides; only vetted drivers (or students) offer them.
 const studentsOnly = requireRole('student');
 function approvedToDrive(req, res, next) {
+  if (req.user.role === 'student' && req.app.locals.config.studentsCanDrive === false) {
+    throw errors.forbidden('DRIVERS_ONLY', 'Offering rides is for driver accounts.');
+  }
   if (req.user.role === 'driver' && req.user.driverStatus !== 'approved') {
     throw errors.forbidden('DRIVER_NOT_APPROVED', 'Your driver application has not been approved yet.');
   }

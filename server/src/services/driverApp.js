@@ -8,13 +8,14 @@ const realtime = require('./realtime');
 
 const STALE_SECONDS = 180;
 
-/** Students with a vehicle and approved drivers can drive. */
-function canDrive(user) {
-  return user.role === 'student' || (user.role === 'driver' && user.driverStatus === 'approved');
+/** Approved drivers can drive. Rider accounts (students and staff) can too unless STUDENTS_CAN_DRIVE is off. */
+function canDrive(user, studentsCanDrive = true) {
+  if (user.role === 'driver') return user.driverStatus === 'approved';
+  return user.role === 'student' && studentsCanDrive;
 }
 
-async function goOnline({ user, vehicleId, lat, lng, ip }) {
-  if (!canDrive(user)) throw errors.forbidden('DRIVER_NOT_APPROVED', 'Your driver application has not been approved yet.');
+async function goOnline({ user, vehicleId, lat, lng, ip, studentsCanDrive = true }) {
+  if (!canDrive(user, studentsCanDrive)) throw errors.forbidden('DRIVER_NOT_APPROVED', 'Your driver application has not been approved yet.');
   return withTransaction(async (client) => {
     const { rows } = await client.query(
       `SELECT vehicle_id, make_model, seat_capacity FROM vehicles WHERE owner_id = $1 AND ($2::uuid IS NULL OR vehicle_id = $2) ORDER BY created_at LIMIT 1`,
@@ -77,7 +78,7 @@ async function dropStaleDrivers() {
 }
 
 /** Everything the driver screen needs in one call. */
-async function state(user) {
+async function state(user, studentsCanDrive = true) {
   const { rows } = await pool.query(
     `SELECT ds.is_online, ds.seats_free, ds.active_ride_id, ds.online_since, v.vehicle_id, v.make_model, v.plate_number, v.colour, v.seat_capacity
        FROM driver_status ds LEFT JOIN vehicles v ON v.vehicle_id = ds.vehicle_id WHERE ds.driver_id = $1`,
@@ -115,7 +116,7 @@ async function state(user) {
   const settings = await dispatch.loadSettings();
   return {
     noShowWaitS: settings.noShowWaitS,
-    canDrive: canDrive(user),
+    canDrive: canDrive(user, studentsCanDrive),
     isOnline: Boolean(ds?.is_online),
     seatsFree: ds?.seats_free ?? 0,
     vehicle: ds?.vehicle_id ? { vehicleId: ds.vehicle_id, makeModel: ds.make_model, plateNumber: ds.plate_number, colour: ds.colour, seatCapacity: ds.seat_capacity } : null,
@@ -124,6 +125,47 @@ async function state(user) {
     offer,
     stats: stats[0], // shown to the driver only, and never used to penalise anyone
     totals: { sharedKes: money[0].shared_kes, rides: money[0].rides },
+  };
+}
+
+/** The driver's home: this week at a glance, money still to collect, and recent rides. */
+async function dashboard(userId) {
+  const { rows: week } = await pool.query(
+    `SELECT count(DISTINCT r.ride_id)::int AS rides, count(s.share_id)::int AS riders,
+            COALESCE(sum(s.amount_kes), 0)::int AS shared_kes,
+            COALESCE(sum(s.amount_kes) FILTER (WHERE s.status = 'paid'), 0)::int AS paid_kes,
+            COALESCE(sum(s.amount_kes) FILTER (WHERE s.status = 'pending'), 0)::int AS pending_kes
+       FROM rides r LEFT JOIN ride_shares s ON s.ride_id = r.ride_id
+      WHERE r.driver_id = $1 AND r.status = 'completed' AND r.completed_at > now() - interval '7 days'`,
+    [userId],
+  );
+  const { rows: collect } = await pool.query(
+    `SELECT s.share_id, s.amount_kes, s.ride_id, u.full_name AS rider_name, r.completed_at,
+            (SELECT t.dropoff_label FROM trip_requests t WHERE t.request_id = s.request_id) AS dropoff
+       FROM ride_shares s JOIN rides r ON r.ride_id = s.ride_id JOIN users u ON u.user_id = s.rider_id
+      WHERE r.driver_id = $1 AND s.status = 'pending' AND s.amount_kes > 0 ORDER BY r.completed_at DESC LIMIT 20`,
+    [userId],
+  );
+  const { rows: rating } = await pool.query(
+    `SELECT u.avg_rating, (SELECT count(*)::int FROM ratings x WHERE x.ratee_id = u.user_id) AS n FROM users u WHERE u.user_id = $1`,
+    [userId],
+  );
+  const { rows: answers } = await pool.query(
+    `SELECT count(*) FILTER (WHERE response = 'accepted')::int AS accepted, count(*) FILTER (WHERE response = 'declined')::int AS declined,
+            count(*) FILTER (WHERE response = 'expired')::int AS expired FROM dispatch_offers WHERE driver_id = $1`,
+    [userId],
+  );
+  const { rows: online } = await pool.query('SELECT is_online, active_ride_id FROM driver_status WHERE driver_id = $1', [userId]);
+  const h = await history(userId);
+  const w = week[0];
+  return {
+    week: { rides: w.rides, riders: w.riders, sharedKes: w.shared_kes, paidKes: w.paid_kes, pendingKes: w.pending_kes },
+    rating: { average: Number(rating[0].avg_rating), count: rating[0].n },
+    answers: answers[0],
+    isOnline: Boolean(online[0]?.is_online),
+    onARide: Boolean(online[0]?.active_ride_id),
+    toCollect: collect.map((c) => ({ shareId: c.share_id, amountKes: c.amount_kes, rideId: c.ride_id, riderName: c.rider_name, at: c.completed_at, dropoff: c.dropoff })),
+    recent: h.rides.slice(0, 5),
   };
 }
 
@@ -146,4 +188,4 @@ async function history(userId) {
   };
 }
 
-module.exports = { canDrive, goOnline, goOffline, updateLocation, dropStaleDrivers, state, history };
+module.exports = { canDrive, goOnline, goOffline, updateLocation, dropStaleDrivers, state, dashboard, history };

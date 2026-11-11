@@ -18,6 +18,8 @@ const schema = z.object({
   ALLOWED_EMAIL_DOMAINS: z.string().min(1, 'ALLOWED_EMAIL_DOMAINS is required'),
   ADMIN_EMAILS: z.string().optional().default(''),
   ALLOW_DRIVER_SIGNUP: boolFromString,
+  // Rider accounts (students and staff) can also drive. Turn off to keep driving for driver accounts only.
+  STUDENTS_CAN_DRIVE: z.enum(['true', 'false', '1', '0', '']).default('true').transform((v) => v !== 'false' && v !== '0'),
   DEMO_EMAIL_DOMAINS: z.string().optional().default(''),
   SMTP_HOST: z.string().optional().default(''),
   SMTP_PORT: z.coerce.number().int().positive().default(587),
@@ -68,6 +70,7 @@ function loadConfig(source = process.env) {
     allowedEmailDomains: [...new Set([...parseDomains(env.ALLOWED_EMAIL_DOMAINS), ...parseDomains(env.DEMO_EMAIL_DOMAINS)])],
     demoEmailDomains: parseDomains(env.DEMO_EMAIL_DOMAINS),
     allowDriverSignup: env.ALLOW_DRIVER_SIGNUP,
+    studentsCanDrive: env.STUDENTS_CAN_DRIVE,
     adminEmails: parseEmails(env.ADMIN_EMAILS),
     smtp: { host: env.SMTP_HOST, port: env.SMTP_PORT, user: env.SMTP_USER, pass: env.SMTP_PASS, from: env.MAIL_FROM },
     appUrl: env.APP_URL,

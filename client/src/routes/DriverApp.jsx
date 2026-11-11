@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
-import { Car, History, Menu, Navigation, Phone, ShieldCheck, Star, Wallet, X } from 'lucide-react'
+import { ArrowLeft, Car, Navigation, Phone, ShieldCheck, Star } from 'lucide-react'
 import { Button } from '../components/ui/Button.jsx'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog.jsx'
 import { Alert } from '../components/ui/Panel.jsx'
@@ -93,8 +93,6 @@ export default function DriverApp() {
 
 function Driving() {
   const { data: st, error, reload } = useLive(api.driverState, { events: ['offer:new', 'offer:gone', 'ride:update'], pollMs: 4000 })
-  const [view, setView] = useState('map')
-  const [menu, setMenu] = useState(false)
   const [consent, setConsent] = useState(false)
   const [busy, setBusy] = useState(false)
   const [problem, setProblem] = useState(null)
@@ -155,9 +153,9 @@ function Driving() {
         <LiveMap markers={markers} car={car ? { lat: car.lat, lng: car.lng, heading: car.heading } : null} fitKey={fitKey} className="absolute inset-0" label="Map of your stops" />
 
         <div className="absolute inset-x-0 top-0 z-[500] flex items-center gap-2 p-3">
-          <button type="button" aria-label="Menu" onClick={() => setMenu(true)} className="focus-ring flex size-12 items-center justify-center rounded-full bg-surface shadow-lg">
-            <Menu size={22} aria-hidden />
-          </button>
+          <Link to="/" aria-label="Back to your dashboard" className="focus-ring flex size-12 items-center justify-center rounded-full bg-surface shadow-lg">
+            <ArrowLeft size={22} aria-hidden />
+          </Link>
           <span className={`inline-flex min-h-12 flex-1 items-center gap-2 rounded-full px-4 text-sm font-medium shadow-lg ${st.isOnline ? 'bg-asphalt text-gold' : 'bg-surface text-ink'}`} role="status">
             <span aria-hidden className={`size-2.5 rounded-full ${st.isOnline ? 'animate-pulse bg-mint' : 'bg-ink/40'}`} />
             {st.isOnline ? 'Online – sharing location' : 'Offline'}
@@ -217,8 +215,6 @@ function Driving() {
         While you are online, RideMate shares your position with the riders you are matched with, and checks it every few seconds. It is never kept as a history, and it stops when you go offline. You are not a taxi: you are sharing a journey you were making anyway.
       </ConfirmDialog>
 
-      {menu && <Drawer view={view} setView={setView} onClose={() => setMenu(false)} />}
-      {view !== 'map' && <Panel view={view} st={st} onClose={() => setView('map')} />}
     </>
   )
 }
@@ -423,104 +419,5 @@ function Summary({ rideId, onDone }) {
       </ul>
       <Button fullWidth variant="secondary" onClick={onDone}>Done</Button>
     </Sheet>
-  )
-}
-
-// ---------------------------------------------------------------- side menu and its screens
-
-const MENU = [
-  ['map', 'Online', Car],
-  ['history', 'Ride history', History],
-  ['cost', 'Cost shared', Wallet],
-  ['ratings', 'Ratings', Star],
-  ['safety', 'Safety', ShieldCheck],
-]
-
-function Drawer({ view, setView, onClose }) {
-  return (
-    <div className="fixed inset-0 z-[1000]">
-      <button type="button" aria-label="Close menu" onClick={onClose} className="absolute inset-0 bg-ink/50" />
-      <nav aria-label="Driver menu" className="absolute inset-y-0 left-0 w-72 max-w-[85%] bg-surface p-4 shadow-2xl">
-        <div className="mb-4 flex items-center justify-between">
-          <p className="font-display text-2xl font-semibold tracking-wide uppercase">Drive</p>
-          <button type="button" aria-label="Close" onClick={onClose} className="focus-ring flex size-11 items-center justify-center rounded-full hover:bg-ink/8"><X size={20} aria-hidden /></button>
-        </div>
-        <ul className="space-y-1">
-          {MENU.map(([id, label, Icon]) => (
-            <li key={id}>
-              <button type="button" onClick={() => { setView(id); onClose() }} aria-current={view === id ? 'page' : undefined} className={`focus-ring flex min-h-12 w-full items-center gap-3 rounded-(--radius-control) px-3 text-left font-medium ${view === id ? 'bg-ink text-gold' : 'text-ink hover:bg-ink/8'}`}>
-                <Icon size={18} aria-hidden /> {label}
-              </button>
-            </li>
-          ))}
-          <li>
-            <Link to="/vehicles" onClick={onClose} className="focus-ring flex min-h-12 items-center gap-3 rounded-(--radius-control) px-3 font-medium text-ink hover:bg-ink/8"><Car size={18} aria-hidden /> My vehicle</Link>
-          </li>
-        </ul>
-      </nav>
-    </div>
-  )
-}
-
-function Panel({ view, st, onClose }) {
-  const { data } = useLive(api.driverHistory, { pollMs: 30000, enabled: ['history', 'ratings', 'cost'].includes(view) })
-  const WHEN = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-  const titles = { history: 'Ride history', cost: 'Cost shared', ratings: 'Ratings', safety: 'Safety' }
-  if (!titles[view]) return null
-  return (
-    <div className="fixed inset-0 z-[900] overflow-y-auto bg-paper p-4 md:left-auto md:w-[30rem] md:shadow-2xl">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="font-display text-3xl font-semibold tracking-wide text-ink-deep uppercase">{titles[view]}</h2>
-        <button type="button" aria-label="Close" onClick={onClose} className="focus-ring flex size-11 items-center justify-center rounded-full hover:bg-ink/8"><X size={20} aria-hidden /></button>
-      </div>
-      {view === 'safety' && (
-        <ul className="space-y-3 text-sm text-ink">
-          <li>Confirm the rider's name before they get in. Never take someone who does not match the request.</li>
-          <li>RideMate is for students sharing a journey they are already making. Do not ask for more than the share shown.</li>
-          <li>Riders have an SOS button. It alerts the RideMate team and shows them your ride.</li>
-          <li>If something goes wrong, report it from the ride after it ends. Reports and the ride record are kept as evidence.</li>
-          <li>Your location is shared only while you are online and only with riders in your ride. It is never stored as a history.</li>
-        </ul>
-      )}
-      {view !== 'safety' && !data && <Spinner />}
-      {view === 'history' && data && (
-        <div className="space-y-3">
-          <div className="rounded-(--radius-panel) border border-ink/20 bg-surface p-3 text-sm">
-            <p className="font-medium text-ink">Your answers to requests</p>
-            <p className="text-ink/85">Accepted {st.stats.accepted} · Declined {st.stats.declined} · Expired {st.stats.expired}. Only you see this, and nothing is penalised.</p>
-          </div>
-          {data.rides.length === 0 ? <p className="text-sm text-ink/85">No rides yet.</p> : (
-            <ul className="space-y-2">
-              {data.rides.map((r) => (
-                <li key={r.rideId} className="rounded-(--radius-panel) border border-ink/20 bg-surface p-3 text-sm">
-                  <p className="font-medium text-ink">{r.places || 'Ride'}</p>
-                  <p className="text-ink/85">{WHEN.format(new Date(r.at))} · {r.riders} rider{r.riders === 1 ? '' : 's'} · {r.status}</p>
-                  {r.status === 'completed' && <p className="text-ink">Shared {kes(r.totalKes)}, paid {kes(r.paidKes)}</p>}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-      {view === 'cost' && (
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-(--radius-panel) border border-ink/20 bg-surface p-3"><p className="text-sm text-ink/85">Rides</p><p className="font-display text-4xl leading-none font-semibold">{st.totals.rides}</p></div>
-            <div className="rounded-(--radius-panel) border border-ink/20 bg-surface p-3"><p className="text-sm text-ink/85">Riders paid you</p><p className="font-display text-4xl leading-none font-semibold">{kes(st.totals.sharedKes)}</p></div>
-          </div>
-          <p className="text-sm text-ink/85">This is fuel cost shared by your riders. RideMate takes no commission.</p>
-        </div>
-      )}
-      {view === 'ratings' && data && (
-        <ul className="space-y-2">
-          {data.ratings.length === 0 ? <li className="text-sm text-ink/85">No ratings yet.</li> : data.ratings.map((r, i) => (
-            <li key={i} className="rounded-(--radius-panel) border border-ink/20 bg-surface p-3 text-sm">
-              <Stars value={r.stars} /> {r.tags?.length > 0 && <span className="text-ink/85">· {r.tags.join(', ')}</span>}
-              {r.comment && <p className="mt-1 text-ink">{r.comment}</p>}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
   )
 }

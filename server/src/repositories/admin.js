@@ -77,7 +77,7 @@ async function dashboard({ from = null, to = null, fuelRate = 24 } = {}, db = po
 
 async function listUsers(search, db = pool, { status = null, role = null } = {}) {
   const { rows } = await db.query(
-    `SELECT user_id, full_name, university_email, faculty, role, status, avg_rating, created_at
+    `SELECT user_id, full_name, university_email, faculty, role, person_type, status, avg_rating, created_at
        FROM users
       WHERE ($1 = '' OR full_name ILIKE '%' || $1 || '%' OR university_email ILIKE '%' || $1 || '%')
         AND ($2::text IS NULL OR status = $2) AND ($3::text IS NULL OR role = $3)
@@ -90,6 +90,7 @@ async function listUsers(search, db = pool, { status = null, role = null } = {})
     universityEmail: u.university_email,
     faculty: u.faculty,
     role: u.role,
+    personType: u.person_type,
     status: u.status,
     avgRating: u.avg_rating,
     createdAt: u.created_at,

@@ -20,7 +20,7 @@ export default function AuthLayout() {
             Shared seat.
           </h1>
           <p className="mt-4 max-w-sm text-base text-paper/90">
-            Carpool to and from campus with verified USIU-Africa students going your way.
+            Carpool to and from campus with verified USIU-Africa students and staff going your way, driven by drivers the RideMate team has checked.
           </p>
         </div>
         <div className="relative mt-auto hidden md:block">

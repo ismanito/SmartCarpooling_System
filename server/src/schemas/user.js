@@ -14,7 +14,9 @@ const kenyanPhone = z
 const fullName = z.string().trim().min(2, 'Enter your full name').max(120);
 const faculty = z.string().trim().min(2, 'Choose your school').max(120);
 
-const createProfileSchema = z.object({ fullName, phoneNumber: kenyanPhone, faculty }).strict();
+// Riders are students or university staff. For staff the "faculty" is their department or office.
+const personType = z.enum(['student', 'staff'], { message: 'Choose student or staff' }).default('student');
+const createProfileSchema = z.object({ fullName, phoneNumber: kenyanPhone, faculty, personType }).strict();
 // Admins are staff, not students, so they have no school.
 const createStaffProfileSchema = z.object({ fullName, phoneNumber: kenyanPhone, faculty: faculty.optional() }).strict();
 
@@ -28,7 +30,7 @@ const licenceNumber = z.string().trim().min(4, 'Enter your driving licence numbe
 const idNumber = z.string().trim().min(5, 'Enter your national ID or passport number').max(20);
 const about = z.string().trim().max(1000, 'Keep this under 1000 characters').optional();
 
-const createDriverProfileSchema = z.object({ fullName, phoneNumber: kenyanPhone, licenceNumber, idNumber, about }).strict();
+const createDriverProfileSchema = z.object({ fullName, phoneNumber: kenyanPhone, licenceNumber, idNumber, about, accountType: z.literal('driver').optional() }).strict();
 const driverApplicationSchema = z.object({ licenceNumber, idNumber, about }).strict();
 
 const checkDomainSchema = z.object({ email: z.string().trim().min(3).max(254) });

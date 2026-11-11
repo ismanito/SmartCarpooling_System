@@ -45,7 +45,7 @@ export default function Profile() {
     <Panel className="mx-auto w-full max-w-xl">
       <PageTitle className="mb-1">Your profile</PageTitle>
       <p className="mb-6 flex flex-wrap items-center gap-2 text-sm text-ink/85">
-        {profile?.universityEmail} <Rating value={profile?.avgRating} />
+        {profile?.universityEmail} · {profile?.role === 'admin' ? 'Administrator' : profile?.role === 'driver' ? 'Driver' : profile?.personType === 'staff' ? 'Staff' : 'Student'} <Rating value={profile?.avgRating} />
       </p>
       {serverError && <Alert tone="error">{serverError}</Alert>}
       {saved && <Alert tone="info">Changes saved.</Alert>}
@@ -56,7 +56,12 @@ export default function Profile() {
         <Field label="Phone number" hint="Only shared with people you have a confirmed ride with" error={errors.phoneNumber?.message}>
           {({ aria }) => <TextField {...aria} {...register('phoneNumber')} type="tel" autoComplete="tel" />}
         </Field>
-        {isStudent && (
+        {isStudent && profile.personType === 'staff' && (
+          <Field label="Department or office" error={errors.faculty?.message}>
+            {({ aria }) => <TextField {...aria} {...register('faculty')} />}
+          </Field>
+        )}
+        {isStudent && profile.personType !== 'staff' && (
           <Field label="Faculty" error={errors.faculty?.message}>
             {({ aria }) => <SelectField {...aria} {...register('faculty')} options={FACULTIES} />}
           </Field>

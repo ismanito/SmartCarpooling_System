@@ -13,3 +13,4 @@ process.env.GOOGLE_MAPS_SERVER_KEY = '';
 process.env.ADMIN_EMAILS = ''; // tests pin who may sign up, whatever is in server/.env
 process.env.ALLOW_DRIVER_SIGNUP = 'false';
 process.env.DEMO_EMAIL_DOMAINS = '';
+process.env.STUDENTS_CAN_DRIVE = 'true';

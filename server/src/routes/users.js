@@ -18,8 +18,20 @@ const drivers = require('../repositories/drivers');
 // The email address decides who you are: a university address is a student, a listed address is an admin,
 // and (when driver sign-up is on) any other address applies to drive. Each gets the form that fits.
 const SCHEMAS = { admin: createStaffProfileSchema, student: createProfileSchema, driver: createDriverProfileSchema };
+/**
+ * Who this email is. Demo-domain addresses are students by default, but may open a driver account when the person
+ * asked for one, so demos need no real inbox for the driver either. Real university addresses never can.
+ */
+function kindOf(req) {
+  const config = req.app.locals.config;
+  const kind = emailKind(req.auth.email, config);
+  const domain = req.auth.email.slice(req.auth.email.lastIndexOf('@') + 1);
+  if (kind === 'student' && req.body?.accountType === 'driver' && (config.demoEmailDomains || []).includes(domain)) return 'driver';
+  return kind;
+}
+
 const profileBody = (req, res, next) => {
-  const kind = emailKind(req.auth.email, req.app.locals.config);
+  const kind = kindOf(req);
   if (!kind) return next(); // the handler below rejects it with the right error
   return validateBody(SCHEMAS[kind])(req, res, next);
 };
@@ -29,14 +41,15 @@ router.post('/', requireAuth({ profile: false }), profileBody, async (req, res) 
   if (req.user) throw errors.conflict('PROFILE_EXISTS', 'Your profile already exists.');
 
   // Defence in depth: requireAuth already checks this, but registration is the one place it must never slip.
-  const kind = emailKind(req.auth.email, req.app.locals.config);
+  const kind = kindOf(req);
   if (!kind) {
     throw errors.forbidden('AUTH_DOMAIN_NOT_ALLOWED', 'RideMate is only open to verified university email addresses.');
   }
 
   try {
     const user = await withTransaction(async (client) => {
-      const { licenceNumber, idNumber, about, ...profile } = req.body;
+      const { licenceNumber, idNumber, about, accountType, ...profile } = req.body; // personType rides along for riders
+      void accountType;
       const row = await usersRepo.create(client, {
         firebaseUid: req.auth.uid,
         email: req.auth.email,

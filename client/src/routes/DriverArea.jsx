@@ -1,11 +1,14 @@
 import { Navigate, Outlet } from 'react-router'
 import { useAuth } from '../context/AuthContext'
 
-/** Driving screens: students and drivers. Admins are staff and go to their console. */
+/**
+ * Driver screens. Only driver accounts belong here: riders go back to their own home and admins to the console.
+ * A driver whose application is still being reviewed (or was rejected) sees the application page instead.
+ */
 export default function DriverArea({ needApproval = false }) {
   const { profile } = useAuth()
   if (profile?.role === 'admin') return <Navigate to="/admin" replace />
-  // A driver whose application is still being reviewed (or was rejected) lands on the status page.
-  if (needApproval && profile?.role === 'driver' && profile.driverStatus !== 'approved') return <Navigate to="/drive" replace />
+  if (profile?.role !== 'driver') return <Navigate to="/" replace />
+  if (needApproval && profile.driverStatus !== 'approved') return <Navigate to="/" replace />
   return <Outlet />
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router'
+import { useNavigate, Link, useSearchParams } from 'react-router'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '../components/ui/Button.jsx'
@@ -9,7 +9,15 @@ import { loginSchema } from '../lib/schemas.js'
 import { firebaseMessage } from '../lib/firebaseErrors.js'
 import { useAuth } from '../context/AuthContext.jsx'
 
+const PORTALS = [
+  { id: 'student', label: 'Student / staff', heading: 'Student or staff sign in', hint: 'Your university email' },
+  { id: 'driver', label: 'Driver', heading: 'Driver sign in', hint: 'The email you applied with' },
+  { id: 'admin', label: 'Admin', heading: 'Administrator sign in', hint: 'Your administrator email' },
+]
+
 export default function Login() {
+  const [params, setParams] = useSearchParams()
+  const portal = PORTALS.find((p) => p.id === params.get('as')) || PORTALS[0]
   const navigate = useNavigate()
   const { logIn } = useAuth()
   const [serverError, setServerError] = useState(null)
@@ -39,12 +47,26 @@ export default function Login() {
 
   return (
     <Panel className="w-full max-w-md">
-      <PageTitle className="mb-6">Welcome back</PageTitle>
+      <div role="tablist" aria-label="Account type" className="mb-5 flex gap-1 rounded-(--radius-control) bg-paper-deep p-1">
+        {PORTALS.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            role="tab"
+            aria-selected={portal.id === p.id}
+            onClick={() => setParams(p.id === 'student' ? {} : { as: p.id }, { replace: true })}
+            className={`focus-ring min-h-11 flex-1 rounded-(--radius-control) px-2 text-sm font-medium ${portal.id === p.id ? 'bg-ink text-gold' : 'text-ink hover:bg-ink/8'}`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+      <PageTitle className="mb-6">{portal.heading}</PageTitle>
       {serverError && <Alert tone="error">{serverError}</Alert>}
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <Field
           label="Email"
-          hint="The email you signed up with"
+          hint={portal.hint}
           error={errors.email?.message}
         >
           {({ aria }) => (
@@ -80,7 +102,7 @@ export default function Login() {
       </form>
       <p className="text-sm text-center mt-6">
         Don't have an account?{' '}
-        <Link to="/signup" className="text-ink underline underline-offset-4">
+        <Link to={`/signup/${portal.id}`} className="text-ink underline underline-offset-4">
           Create one
         </Link>
       </p>

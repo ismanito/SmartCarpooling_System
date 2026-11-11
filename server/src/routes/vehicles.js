@@ -12,6 +12,13 @@ const ridesRepo = require('../repositories/rides');
 
 const router = Router();
 router.use(requireAuth(), requireRole('student', 'driver'));
+// Vehicles belong to driver accounts. Rider accounts keep them only while STUDENTS_CAN_DRIVE is on.
+router.use((req, res, next) => {
+  if (req.user.role === 'student' && req.app.locals.config.studentsCanDrive === false) {
+    throw errors.forbidden('DRIVERS_ONLY', 'Vehicles are for driver accounts.');
+  }
+  next();
+});
 
 function plateConflict(err) {
   if (err.code === PG.UNIQUE_VIOLATION) {

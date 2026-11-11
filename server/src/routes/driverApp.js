@@ -1,4 +1,5 @@
 const { Router } = require('express');
+const { errors } = require('../lib/errors');
 const { requireAuth } = require('../middleware/auth');
 const { requireRole } = require('../middleware/requireRole');
 const { validateBody, uuidParam } = require('../middleware/validate');
@@ -9,16 +10,24 @@ const rideOps = require('../services/rideOps');
 
 const authed = [requireAuth(), requireRole('student', 'driver')];
 const me = (req) => ({ userId: req.user.userId, role: req.user.role, driverStatus: req.user.driverStatus });
+const studentsCanDrive = (req) => req.app.locals.config.studentsCanDrive !== false;
+
+/** The driving screens belong to driver accounts. Rider accounts get in only while STUDENTS_CAN_DRIVE is on. */
+function driversOnly(req, res, next) {
+  if (req.user.role === 'student' && !studentsCanDrive(req)) throw errors.forbidden('DRIVERS_ONLY', 'This area is for driver accounts.');
+  next();
+}
 
 // ---------------------------------------------------------------- the driver's own screen (/api/driver)
 const driver = Router();
-driver.use(...authed);
+driver.use(...authed, driversOnly);
 
-driver.get('/state', async (req, res) => res.json(await driverApp.state(me(req))));
+driver.get('/state', async (req, res) => res.json(await driverApp.state(me(req), studentsCanDrive(req))));
+driver.get('/dashboard', async (req, res) => res.json(await driverApp.dashboard(req.user.userId)));
 driver.get('/history', async (req, res) => res.json(await driverApp.history(req.user.userId)));
 
 driver.post('/online', validateBody(onlineSchema), async (req, res) => {
-  res.json(await driverApp.goOnline({ user: me(req), vehicleId: req.body.vehicleId, lat: req.body.lat, lng: req.body.lng, ip: req.ip }));
+  res.json(await driverApp.goOnline({ user: me(req), vehicleId: req.body.vehicleId, lat: req.body.lat, lng: req.body.lng, ip: req.ip, studentsCanDrive: studentsCanDrive(req) }));
 });
 driver.post('/offline', async (req, res) => {
   await driverApp.goOffline({ userId: req.user.userId, ip: req.ip });
@@ -31,7 +40,7 @@ driver.post('/location', validateBody(locationSchema), async (req, res) => {
 
 // ---------------------------------------------------------------- answering an offer (/api/offers)
 const offers = Router();
-offers.use(...authed);
+offers.use(...authed, driversOnly);
 offers.post('/:id/accept', uuidParam('id'), async (req, res) => {
   res.json(await dispatch.acceptOffer({ offerId: req.params.id, driverId: req.user.userId, ip: req.ip }));
 });
@@ -63,7 +72,7 @@ rides.post('/:id/sos', uuidParam('id'), act('sos', (req) => rideOps.sos({ rideId
 
 // ---------------------------------------------------------------- paying (/api/ride-shares)
 const shares = Router();
-shares.use(...authed);
+shares.use(...authed, driversOnly);
 shares.post('/:id/settle', uuidParam('id'), act('settle', (req) => rideOps.settleShare({ shareId: req.params.id, driverId: req.user.userId, ip: req.ip })));
 
 module.exports = { driver, offers, rides, shares };

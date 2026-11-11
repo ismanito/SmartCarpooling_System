@@ -1,7 +1,7 @@
 const { pool } = require('../db/pool');
 
 const COLUMNS = `user_id, firebase_uid, full_name, university_email, phone_number, faculty,
-                 role, is_verified, status, avg_rating, created_at, updated_at,
+                 role, person_type, is_verified, status, avg_rating, created_at, updated_at,
                  (SELECT d.status FROM driver_applications d WHERE d.user_id = users.user_id) AS driver_status`;
 
 async function findByFirebaseUid(firebaseUid, db = pool) {
@@ -33,12 +33,12 @@ async function markVerified(userId, db = pool) {
   return rows[0];
 }
 
-async function create(db, { firebaseUid, email, fullName, phoneNumber, faculty, role = 'student' }) {
+async function create(db, { firebaseUid, email, fullName, phoneNumber, faculty, role = 'student', personType = 'student' }) {
   const { rows } = await db.query(
-    `INSERT INTO users (firebase_uid, university_email, full_name, phone_number, faculty, role, is_verified)
-     VALUES ($1, $2, $3, $4, $5, $6, true)
+    `INSERT INTO users (firebase_uid, university_email, full_name, phone_number, faculty, role, person_type, is_verified)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, true)
      RETURNING ${COLUMNS}`,
-    [firebaseUid, email, fullName, phoneNumber, faculty, role],
+    [firebaseUid, email, fullName, phoneNumber, faculty, role, personType],
   );
   return rows[0];
 }
@@ -73,6 +73,7 @@ function toApi(row) {
     phoneNumber: row.phone_number,
     faculty: row.faculty,
     role: row.role,
+    personType: row.person_type,
     isVerified: row.is_verified,
     status: row.status,
     driverStatus: row.driver_status || null,

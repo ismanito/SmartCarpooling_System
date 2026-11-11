@@ -126,6 +126,8 @@ export const api = {
   cancelTripRequest: (id, series = false) => request(`/requests/${id}/cancel`, { method: 'POST', body: series ? { series: true } : {} }),
   editTripRequest: (id, body) => request(`/requests/${id}`, { method: 'PATCH', body }),
   driverState: () => request('/driver/state'),
+  driverDashboard: () => request('/driver/dashboard'),
+  requestHistory: () => request('/requests/history'),
   driverHistory: () => request('/driver/history'),
   goOnline: (body) => request('/driver/online', { method: 'POST', body }),
   goOffline: () => request('/driver/offline', { method: 'POST' }),

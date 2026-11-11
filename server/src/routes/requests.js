@@ -75,6 +75,40 @@ router.get('/mine', async (req, res) => {
   res.json({ requests: rows.map((r) => toApi(r, zones, { driverFirstName: r.driver_name ? r.driver_name.split(' ')[0] : null })) });
 });
 
+/** Rides taken, what each cost the rider, and what is still owed. */
+router.get('/history', async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT r.request_id, r.pickup_label, r.dropoff_label, r.status, r.created_at, r.ride_id, r.cancel_reason,
+            s.amount_kes, s.status AS share_status, d.full_name AS driver_name
+       FROM trip_requests r
+       LEFT JOIN ride_shares s ON s.request_id = r.request_id
+       LEFT JOIN users d ON d.user_id = r.driver_id
+      WHERE r.rider_id = $1 AND r.status IN ('completed', 'cancelled', 'no_driver')
+      ORDER BY r.created_at DESC LIMIT 100`,
+    [req.user.userId],
+  );
+  const taken = rows.filter((r) => r.status === 'completed');
+  res.json({
+    summary: {
+      ridesTaken: taken.length,
+      sharedKes: taken.reduce((n, r) => n + (r.amount_kes || 0), 0),
+      owedKes: taken.filter((r) => r.share_status === 'pending').reduce((n, r) => n + (r.amount_kes || 0), 0),
+    },
+    rides: rows.map((r) => ({
+      requestId: r.request_id,
+      rideId: r.ride_id,
+      status: r.status,
+      pickup: r.pickup_label,
+      dropoff: r.dropoff_label,
+      at: r.created_at,
+      driverFirstName: r.driver_name ? r.driver_name.split(' ')[0] : null,
+      shareKes: r.amount_kes ?? null,
+      shareStatus: r.share_status ?? null,
+      cancelReason: r.cancel_reason,
+    })),
+  });
+});
+
 router.get('/:id', uuidParam('id'), async (req, res) => {
   const r = await dispatch.findRequest(pool, req.params.id);
   if (!r || r.rider_id !== req.user.userId) throw errors.notFound('Request not found.');
