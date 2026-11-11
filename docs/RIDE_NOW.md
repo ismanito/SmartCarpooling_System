@@ -4,7 +4,9 @@ Students ask for a ride (**Ride Now**) or book one ahead (**Book**, optionally r
 
 Drivers no longer post trips. They go online and answer requests. The old trip-posting screens are kept under **Classic carpool (old)**, with a banner saying they are being retired. Nothing was deleted.
 
-Screenshots of the rider, driver and admin flows are in [`docs/screenshots`](screenshots), in the order they were taken during one run in a real browser (`01` to `24`).
+Screenshots of the rider, driver and admin flows are in [`docs/screenshots`](screenshots) (`01` to `24`, one real browser run), and of the three separate portals in [`docs/screenshots/portals`](screenshots/portals) (`01` to `18`).
+
+There are three separate portals (student or staff, driver, admin), each with its own sign-up, dashboard and menu. See the README.
 
 ## Where things are
 

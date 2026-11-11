@@ -107,13 +107,17 @@ npm --prefix server run make-admin -- someone@example.com
 
 Log out and back in, and the Admin menu appears.
 
-## Dashboards
+## Three separate portals
 
-| Who | Where | Shows |
-|---|---|---|
-| Rider | `/` | Upcoming rides, what you owe, fares you can pay or split with friends |
-| Driver | `/driver` | Open trips, riders waiting for an answer, passengers and who has paid, money collected |
-| Admin | `/admin` | Billed / collected / outstanding money, users, audit log, matching settings |
+Each kind of account has its own sign-up, dashboard and menu. Sign-up starts at `/signup`, where you choose the account type. Sign-in at `/login` has a tab for each.
+
+| Account | Who | Sign-up | Home and menu |
+|---|---|---|---|
+| **Student or staff** (riders) | University students and staff | University email. Staff give their department instead of a faculty | `/` the Ride Now map. My bookings, My rides (history and what you owe), Profile |
+| **Driver** | Anyone with a licence, any email (Gmail works) | Email, then an application (licence and ID) that an admin approves | `/` the driver dashboard (this week, money to collect, vehicle), Drive (the map), Ride history, Cost shared, Ratings, Vehicles, Safety, Profile. A side menu on larger screens |
+| **Admin** | The RideMate team | Email addresses listed in `ADMIN_EMAILS` only | `/admin` the console: dashboard, users, driver applications, live map, zones, dispatch, incidents, payments, audit log |
+
+Drivers are separate from students and staff. With `STUDENTS_CAN_DRIVE=false` (the default in `.env.example`), rider accounts cannot open the driving screens or register vehicles, and driver accounts cannot ask for rides. Demo email domains (`DEMO_EMAIL_DOMAINS`) can open driver accounts too, so demos need no real inbox.
 
 ## Sharing the fare
 
@@ -146,7 +150,7 @@ Students tap **Ride Now** (or **Book**, optionally repeating on chosen days). Th
 
 Full details, the dispatch algorithm as built, test and simulation results, and the list of proposal sections to update are in [docs/RIDE_NOW.md](docs/RIDE_NOW.md). Screenshots are in `docs/screenshots`.
 
-Demo (two phones or browser windows, and the admin): sign up with `name@demo.ridemate.test` addresses (verified automatically). Driver: add a vehicle, open **Drive**, pick a demo location, **GO ONLINE**. Rider: search "Roysambu", **Ride Now**, confirm. Driver: **Accept**. A second rider asking for the same area is pooled into the same car. Driver: Arrived, Picked up, Dropped off, slide to complete. Both rate. Admin: **Live map**, **Zones**, **Dispatch** (analytics, request log, settings).
+Demo (two phones or browser windows, and the admin): sign up with `name@demo.ridemate.test` addresses (verified automatically). Driver: choose **Driver** at sign-up, send the application, have the admin approve it under **Driver applications**, add a vehicle, open **Drive**, pick a demo location, **GO ONLINE**. Student or staff rider: search "Roysambu", **Ride Now**, confirm. Driver: **Accept**. A second rider asking for the same area is pooled into the same car. Driver: Arrived, Picked up, Dropped off, slide to complete. Both rate. Admin: **Live map**, **Zones**, **Dispatch** (analytics, request log, settings).
 
 `npm --prefix server run simulate` runs 20 drivers and 60 requests against the test database and prints the figures for the report.
 
