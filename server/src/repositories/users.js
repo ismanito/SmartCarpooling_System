@@ -1,8 +1,9 @@
 const { pool } = require('../db/pool');
 
 const COLUMNS = `user_id, firebase_uid, full_name, university_email, phone_number, faculty,
-                 role, person_type, is_verified, status, avg_rating, created_at, updated_at,
-                 (SELECT d.status FROM driver_applications d WHERE d.user_id = users.user_id) AS driver_status`;
+                 role, person_type, admin_level, allow_external_drivers, is_verified, status, avg_rating, created_at, updated_at,
+                 (SELECT v.status FROM driver_verifications v WHERE v.driver_id = users.user_id) AS driver_status,
+                 (SELECT v.driver_type FROM driver_verifications v WHERE v.driver_id = users.user_id) AS driver_type`;
 
 async function findByFirebaseUid(firebaseUid, db = pool) {
   const { rows } = await db.query(`SELECT ${COLUMNS} FROM users WHERE firebase_uid = $1`, [firebaseUid]);
@@ -33,12 +34,12 @@ async function markVerified(userId, db = pool) {
   return rows[0];
 }
 
-async function create(db, { firebaseUid, email, fullName, phoneNumber, faculty, role = 'student', personType = 'student' }) {
+async function create(db, { firebaseUid, email, fullName, phoneNumber, faculty, role = 'student', personType = 'student', adminLevel = 'admin' }) {
   const { rows } = await db.query(
-    `INSERT INTO users (firebase_uid, university_email, full_name, phone_number, faculty, role, person_type, is_verified)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+    `INSERT INTO users (firebase_uid, university_email, full_name, phone_number, faculty, role, person_type, admin_level, is_verified)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)
      RETURNING ${COLUMNS}`,
-    [firebaseUid, email, fullName, phoneNumber, faculty, role, personType],
+    [firebaseUid, email, fullName, phoneNumber, faculty, role, personType, adminLevel],
   );
   return rows[0];
 }
@@ -77,10 +78,26 @@ function toApi(row) {
     isVerified: row.is_verified,
     status: row.status,
     driverStatus: row.driver_status || null,
+    driverType: row.driver_type || null,
+    adminLevel: row.role === 'admin' ? row.admin_level : undefined,
+    allowExternalDrivers: row.allow_external_drivers,
     avgRating: row.avg_rating,
     createdAt: row.created_at,
   };
 }
 
+/** A rider chooses whether external (non-university) drivers may be matched with them. */
+async function setAllowExternal(db, userId, allow) {
+  const { rows } = await db.query(`UPDATE users SET allow_external_drivers = $2 WHERE user_id = $1 RETURNING ${COLUMNS}`, [userId, allow]);
+  return rows[0];
+}
+
+async function promoteSenior(userId, db = pool) {
+  const { rows } = await db.query(`UPDATE users SET admin_level = 'senior_admin' WHERE user_id = $1 RETURNING ${COLUMNS}`, [userId]);
+  return rows[0];
+}
+
 module.exports = {
+  promoteSenior,
+  setAllowExternal,
   relinkByEmail, findByFirebaseUid, findById, markVerified, create, updateProfile, toApi, UPDATABLE };

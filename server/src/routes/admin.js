@@ -9,7 +9,6 @@ const { verifyAuditChain, appendAudit } = require('../services/audit');
 const admin = require('../repositories/admin');
 const paymentsRepo = require('../repositories/payments');
 const incidents = require('../services/incidents');
-const driversRepo = require('../repositories/drivers');
 const rides = require('../repositories/rides');
 const { notify } = require('../services/notify');
 
@@ -106,48 +105,6 @@ async function changeStatus(req, res, status) {
 router.post('/users/:id/status', uuidParam('id'), validateBody(statusSchema), (req, res) => changeStatus(req, res, req.body.status));
 router.post('/users/:id/suspend', uuidParam('id'), (req, res) => changeStatus(req, res, 'suspended'));
 router.post('/users/:id/reinstate', uuidParam('id'), (req, res) => changeStatus(req, res, 'active'));
-
-// ---------------------------------------------------------------- driver applications
-
-router.get('/drivers', async (req, res) => {
-  const status = ['pending', 'approved', 'rejected'].includes(req.query.status) ? req.query.status : null;
-  res.json({ applications: await driversRepo.list(status) });
-});
-
-const driverDecisionSchema = z
-  .object({
-    decision: z.enum(['approved', 'rejected'], { message: 'Choose approve or reject' }),
-    notes: z.string().trim().max(2000).optional(),
-  })
-  .strict();
-
-router.post('/drivers/:id/decision', uuidParam('id'), validateBody(driverDecisionSchema), async (req, res) => {
-  await withTransaction(async (client) => {
-    const app = await driversRepo.findForUpdate(client, req.params.id);
-    if (!app) throw errors.notFound('Application not found.');
-    if (app.status !== 'pending') throw errors.conflict('APPLICATION_CLOSED', `This application is already ${app.status}.`);
-    await driversRepo.decide(client, app.application_id, { status: req.body.decision, notes: req.body.notes, adminId: req.user.userId });
-    await appendAudit(client, {
-      userId: req.user.userId,
-      action: req.body.decision === 'approved' ? 'driver.approve' : 'driver.reject',
-      entity: 'driver_application',
-      entityId: app.application_id,
-      ipAddress: req.ip,
-      details: { application_id: app.application_id, user_id: app.user_id, decision: req.body.decision },
-    });
-    await notify(client, {
-      userId: app.user_id,
-      type: req.body.decision === 'approved' ? 'driver.approved' : 'driver.rejected',
-      message:
-        req.body.decision === 'approved'
-          ? 'Your driver application was approved. You can now add your vehicle and offer rides.'
-          : `Your driver application was not approved.${req.body.notes ? ` Reason: ${req.body.notes}` : ''} You can fix your details and apply again.`,
-      link: '/driver',
-      email: true,
-    });
-  });
-  res.json({ applications: await driversRepo.list(null) });
-});
 
 // ---------------------------------------------------------------- incident reports
 

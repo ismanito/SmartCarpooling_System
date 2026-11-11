@@ -47,7 +47,7 @@ const point = (lat, lng) => `ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geo
 
 const REQ_COLUMNS = `r.request_id, r.rider_id, r.series_id, r.group_id, r.type, r.pickup_label, r.pickup_zone, r.dropoff_label, r.dropoff_zone,
   r.scheduled_for, r.repeat_days, r.seats, r.status, r.route_km, r.est_share_kes, r.est_pooled_kes, r.ride_id, r.driver_id,
-  r.cancel_reason, r.assigned_at, r.created_at,
+  r.cancel_reason, r.assigned_at, r.created_at, r.rider_confirmed_driver_at,
   ST_Y(r.pickup_point::geometry) AS pickup_lat, ST_X(r.pickup_point::geometry) AS pickup_lng,
   ST_Y(r.dropoff_point::geometry) AS dropoff_lat, ST_X(r.dropoff_point::geometry) AS dropoff_lng`;
 
@@ -118,12 +118,20 @@ async function nearbyDrivers(db, request, seats, s, { excludeRecentSeconds = nul
        FROM trip_requests r
        JOIN driver_status ds ON ds.is_online AND ds.current_location IS NOT NULL
        JOIN users u ON u.user_id = ds.driver_id
+       JOIN users rider ON rider.user_id = r.rider_id
        JOIN vehicles v ON v.vehicle_id = ds.vehicle_id
       WHERE r.request_id = $1
         AND ds.last_seen_at > now() - interval '90 seconds'
         AND ds.seats_free >= $2
         AND u.status = 'active' AND u.is_verified
-        AND (u.role = 'student' OR (u.role = 'driver' AND EXISTS (SELECT 1 FROM driver_applications da WHERE da.user_id = u.user_id AND da.status = 'approved')))
+        -- Only approved drivers whose papers are all still valid, driving the vehicle that was verified. External drivers
+        -- also need the external track switched on and a rider who accepts them.
+        AND EXISTS (SELECT 1 FROM driver_verifications dv
+                     WHERE dv.driver_id = u.user_id AND dv.status = 'approved' AND dv.vehicle_id = ds.vehicle_id
+                       AND dv.licence_expiry >= current_date AND dv.insurance_expiry >= current_date
+                       AND (dv.id_expiry IS NULL OR dv.id_expiry >= current_date)
+                       AND (dv.driver_type <> 'external' OR (dv.psv_badge_expiry >= current_date AND rider.allow_external_drivers
+                            AND (SELECT setting_value FROM system_settings WHERE setting_key = 'external_drivers_enabled') = 'true')))
         AND ds.driver_id <> r.rider_id
         AND ST_DWithin(ds.current_location, r.pickup_point, $3)
         AND NOT EXISTS (SELECT 1 FROM dispatch_offers o

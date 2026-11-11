@@ -55,6 +55,7 @@ async function main() {
 
   // Clean up anything a previous run left, then create the people.
   await pool.query(`DELETE FROM users WHERE university_email LIKE 'sim-%@usiu.ac.ke'`);
+  await pool.query(`UPDATE system_settings SET setting_value = '0' WHERE setting_key = 'random_selfie_check_percent'`);
   const make = async (kind, i) => {
     const { rows } = await pool.query(
       `INSERT INTO users (firebase_uid, full_name, university_email, phone_number, faculty, role, is_verified, avg_rating)
@@ -68,7 +69,13 @@ async function main() {
   const drivers = [];
   for (let i = 0; i < DRIVERS; i += 1) {
     const userId = await make('driver', i);
-    await pool.query(`INSERT INTO vehicles (owner_id, make_model, plate_number, colour, seat_capacity) VALUES ($1, 'Toyota Axio', $2, 'White', 3)`, [userId, `SIM${100 + i}X`]);
+    const { rows: car } = await pool.query(`INSERT INTO vehicles (owner_id, make_model, plate_number, colour, seat_capacity) VALUES ($1, 'Toyota Axio', $2, 'White', 3) RETURNING vehicle_id`, [userId, `SIM${100 + i}X`]);
+    // Drivers must be verified to go online, so each simulated driver is given an approved verification with valid papers.
+    await pool.query(
+      `INSERT INTO driver_verifications (driver_id, driver_type, status, consent_at, licence_expiry, insurance_expiry, vehicle_id, approved_at, next_recheck_at)
+       VALUES ($1, 'student', 'approved', now(), '2030-01-01', '2030-01-01', $2, now(), now() + interval '6 months')`,
+      [userId, car[0].vehicle_id],
+    );
     // Most drivers live near campus (that is where students travel to), the rest are spread around.
     const z = i < Math.ceil(DRIVERS * 0.6) ? pick(near) : pick(outer);
     const at = inZone(z);
@@ -104,6 +111,7 @@ async function main() {
   const finishRides = async () => {
     const { rows: active } = await pool.query(`SELECT ride_id, driver_id FROM rides WHERE status IN ('heading_to_pickup', 'in_progress')`);
     for (const r of active) {
+      await pool.query('UPDATE trip_requests SET rider_confirmed_driver_at = now() WHERE ride_id = $1', [r.ride_id]); // riders confirm the car before pick-up
       for (const s of await dispatch.remainingStops(pool, r.ride_id)) {
         await rideOps.arrived({ rideId: r.ride_id, stopId: s.stopId, driverId: r.driver_id });
         await rideOps.done({ rideId: r.ride_id, stopId: s.stopId, driverId: r.driver_id });

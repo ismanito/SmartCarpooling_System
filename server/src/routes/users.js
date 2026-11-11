@@ -9,11 +9,10 @@ const { appendAudit } = require('../services/audit');
 const usersRepo = require('../repositories/users');
 
 const router = Router();
+const { z } = require('zod');
 
 const { emailKind } = require('../lib/emailDomain');
 const { createDriverProfileSchema } = require('../schemas/user');
-const { notifyMany, adminIds } = require('../services/notify');
-const drivers = require('../repositories/drivers');
 
 // The email address decides who you are: a university address is a student, a listed address is an admin,
 // and (when driver sign-up is on) any other address applies to drive. Each gets the form that fits.
@@ -56,6 +55,7 @@ router.post('/', requireAuth({ profile: false }), profileBody, async (req, res) 
         ...profile,
         faculty: kind === 'admin' ? 'Administration' : kind === 'driver' ? 'Driver' : profile.faculty,
         role: kind,
+        adminLevel: kind === 'admin' && (req.app.locals.config.seniorAdminEmails || []).includes(req.auth.email) ? 'senior_admin' : 'admin',
       });
       await appendAudit(client, {
         userId: row.user_id,
@@ -66,21 +66,8 @@ router.post('/', requireAuth({ profile: false }), profileBody, async (req, res) 
         details: { firebase_uid: req.auth.uid, role: row.role },
       });
       if (kind === 'driver') {
-        const app = await drivers.createApplication(client, row.user_id, { licenceNumber, idNumber, about });
-        await appendAudit(client, {
-          userId: row.user_id,
-          action: 'driver.apply',
-          entity: 'driver_application',
-          entityId: app.application_id,
-          ipAddress: req.ip,
-          details: { application_id: app.application_id, user_id: row.user_id },
-        });
-        await notifyMany(client, await adminIds(client), {
-          type: 'driver.application',
-          message: `${row.full_name} applied to drive. Review the application.`,
-          link: '/admin?tab=drivers',
-          email: true,
-        });
+        // The verification wizard does the rest. Nothing to review until they submit it.
+        await client.query(`INSERT INTO driver_verifications (driver_id, driver_type) VALUES ($1, 'external') ON CONFLICT DO NOTHING`, [row.user_id]);
       }
       return usersRepo.findById(row.user_id, client);
     });
@@ -89,6 +76,16 @@ router.post('/', requireAuth({ profile: false }), profileBody, async (req, res) 
     if (err.code === PG.UNIQUE_VIOLATION) throw errors.conflict('PROFILE_EXISTS', 'A profile with this email already exists.');
     throw err;
   }
+});
+
+/** A rider's own choices. Right now: whether external (non-university) drivers may be matched with them. */
+router.put('/me/settings', requireAuth(), validateBody(z.object({ allowExternalDrivers: z.boolean() }).strict()), async (req, res) => {
+  const user = await withTransaction(async (client) => {
+    const row = await usersRepo.setAllowExternal(client, req.user.userId, req.body.allowExternalDrivers);
+    await appendAudit(client, { userId: req.user.userId, action: 'user.settings', entity: 'user', entityId: req.user.userId, ipAddress: req.ip, details: { allow_external_drivers: req.body.allowExternalDrivers } });
+    return row;
+  });
+  res.json({ user: usersRepo.toApi(user) });
 });
 
 router.get('/me', requireAuth(), (req, res) => {

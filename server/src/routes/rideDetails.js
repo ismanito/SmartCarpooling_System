@@ -148,6 +148,7 @@ router.post('/bookings/:id/incidents', uuidParam('id'), validateBody(incidentSch
     });
     return rows[0];
   });
+  await require('../services/verification').suspendIfUnsafe(req.body.reportedUserId);
   res.status(201).json({ reportId: report.report_id });
 });
 

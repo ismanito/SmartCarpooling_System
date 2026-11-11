@@ -1,4 +1,4 @@
-const { api, resetDb, createStudent, createAdmin, auth, pool, auditRows } = require('./helpers/testApp');
+const { api, resetDb, createStudent, createAdmin, auth, pool, auditRows, approveAsDriver } = require('./helpers/testApp');
 const { verifyAuditChain } = require('../src/services/audit');
 const dispatch = require('../src/services/dispatch');
 const booking = require('../src/services/booking');
@@ -26,6 +26,7 @@ async function onlineDriver(at, name = 'Dan Driver') {
   plateNo += 1;
   const d = await createStudent({ fullName: name });
   await api().post('/api/vehicles').set(auth(d.token)).send({ makeModel: 'Toyota Axio', plateNumber: `KDQ${100 + plateNo}Q`, colour: 'White', seatCapacity: 3 }).expect(201);
+  await approveAsDriver(d.user.userId);
   await api().post('/api/driver/online').set(auth(d.token)).send({ lat: at.lat, lng: at.lng }).expect(200);
   return d;
 }
@@ -94,8 +95,8 @@ describe('finding a driver', () => {
     const far = await onlineDriver({ lat: -1.2676, lng: 36.8108 }, 'Far Frank'); // Westlands, well over 3 km away
     const noCar = await createStudent({ fullName: 'No Car' });
     const refused = await api().post('/api/driver/online').set(auth(noCar.token)).send({ lat: GATE.lat, lng: GATE.lng });
-    expect(refused.status).toBe(409);
-    expect(refused.body.error.code).toBe('NO_VEHICLE');
+    expect(refused.status).toBe(403);
+    expect(refused.body.error.code).toBe('DRIVER_NOT_VERIFIED');
 
     const r = await rider();
     const req = (await ask(r, GATE, ROYSAMBU).expect(201)).body.request;
@@ -153,7 +154,7 @@ describe('accepting', () => {
     await ask(r, GATE, ROYSAMBU).expect(201);
     const { offer } = await state(a);
     expect((await accept(other, offer.offerId)).status).toBe(404);
-    expect((await accept(r, offer.offerId)).status).toBe(404);
+    expect((await accept(r, offer.offerId)).status).toBe(403); // a rider is not a verified driver
     await accept(a, offer.offerId).expect(200);
     expect((await accept(a, offer.offerId)).status).toBe(409);
     expect((await decline(a, offer.offerId)).status).toBe(409);
@@ -230,7 +231,9 @@ describe('a whole ride', () => {
     const rb = (await ask(b, NEAR_GATE, KASARANI).expect(201)).body.request;
     await accept(d, (await state(d)).offer.offerId).expect(200);
     const s = await state(d);
-    return { d, a, b, ra, rb, rideId: s.ride.ride.rideId, stops: s.ride.stops };
+    // Riders confirm the driver and car in the app before pick-up; here that is recorded directly.
+    await pool.query('UPDATE trip_requests SET rider_confirmed_driver_at = now() WHERE ride_id = $1', [s.ride.ride.rideId]);
+    return { d, a, b, ra, rb, rideId: s.ride.ride.rideId, stops: (await state(d)).ride.stops };
   }
   const stopStep = (d, rideId, stopId, step) => api().post(`/api/rides/${rideId}/stops/${stopId}/${step}`).set(auth(d.token));
 
@@ -259,7 +262,7 @@ describe('a whole ride', () => {
     // Driver confirms the cash, then everyone rates.
     await api().post(`/api/ride-shares/${all.shares[0].shareId}/settle`).set(auth(d.token)).expect(204);
     expect((await api().post(`/api/ride-shares/${all.shares[0].shareId}/settle`).set(auth(d.token))).status).toBe(409);
-    expect((await api().post(`/api/ride-shares/${all.shares[1].shareId}/settle`).set(auth(a.token))).status).toBe(404);
+    expect((await api().post(`/api/ride-shares/${all.shares[1].shareId}/settle`).set(auth(a.token))).status).toBe(403); // a rider is not a driver
     await api().post(`/api/rides/${rideId}/ratings`).set(auth(a.token)).send({ rateeId: d.user.userId, stars: 4, tags: ['On time'] }).expect(201);
     expect((await api().post(`/api/rides/${rideId}/ratings`).set(auth(a.token)).send({ rateeId: d.user.userId, stars: 1 })).status).toBe(409);
     expect((await api().get('/api/users/me').set(auth(d.token))).body.user.avgRating).toBe(4);

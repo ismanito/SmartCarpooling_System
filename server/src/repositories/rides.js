@@ -126,7 +126,7 @@ const PAIR_SELECT = `
 
 const PAIR_WHERE = `
       o.status = 'open' AND r.status = 'open' AND u.status = 'active'
-  AND (u.role <> 'driver' OR EXISTS (SELECT 1 FROM driver_applications da WHERE da.user_id = u.user_id AND da.status = 'approved'))
+  AND (u.role <> 'driver' OR EXISTS (SELECT 1 FROM driver_verifications dv WHERE dv.driver_id = u.user_id AND dv.status = 'approved'))
   AND o.depart_at > now() AND r.depart_at > now()
   AND o.driver_id <> r.rider_id
   AND o.seats_available >= r.seats_needed

@@ -4,6 +4,7 @@
  */
 const crypto = require('node:crypto');
 const { pool, withTransaction } = require('../db/pool');
+const { config } = require('../config/env');
 const { errors } = require('../lib/errors');
 const { appendAudit } = require('./audit');
 const { notify } = require('./notify');
@@ -225,6 +226,8 @@ async function topUpSeries() {
   return added;
 }
 
+let lastVerificationRun = 0;
+
 /** One pass of everything that has to happen on a timer. */
 async function tick() {
   const out = {};
@@ -232,6 +235,11 @@ async function tick() {
   out.due = await dispatchDueBookings();
   out.retried = await retrySearching();
   out.offline = await driverApp.dropStaleDrivers();
+  // Expiry, reminders, re-checks, file retention and automatic suspension: about once an hour.
+  if (!config.isTest && Date.now() - lastVerificationRun > 3600_000) {
+    lastVerificationRun = Date.now();
+    out.verification = await require('./verification').runJobs().catch((err) => ({ error: err.message }));
+  }
   return out;
 }
 

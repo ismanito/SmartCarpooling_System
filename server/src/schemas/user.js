@@ -30,7 +30,8 @@ const licenceNumber = z.string().trim().min(4, 'Enter your driving licence numbe
 const idNumber = z.string().trim().min(5, 'Enter your national ID or passport number').max(20);
 const about = z.string().trim().max(1000, 'Keep this under 1000 characters').optional();
 
-const createDriverProfileSchema = z.object({ fullName, phoneNumber: kenyanPhone, licenceNumber, idNumber, about, accountType: z.literal('driver').optional() }).strict();
+// A driver account is just a name and phone. The licence, ID and papers go through the verification wizard.
+const createDriverProfileSchema = z.object({ fullName, phoneNumber: kenyanPhone, accountType: z.literal('driver').optional() }).strict();
 const driverApplicationSchema = z.object({ licenceNumber, idNumber, about }).strict();
 
 const checkDomainSchema = z.object({ email: z.string().trim().min(3).max(254) });

@@ -11,6 +11,7 @@ const { notify, notifyMany, adminIds } = require('./notify');
 const { zoneNames } = require('./zones');
 const realtime = require('./realtime');
 const dispatch = require('./dispatch');
+const verification = require('./verification');
 
 const STOP_COLUMNS = `s.stop_id, s.request_id, s.kind, s.label, s.sequence, s.eta, s.arrived_at, s.done_at, s.no_show,
   ST_Y(s.point::geometry) AS lat, ST_X(s.point::geometry) AS lng`;
@@ -84,6 +85,9 @@ async function done({ rideId, stopId, driverId, ip }) {
     if (stop.done_at) throw errors.conflict('STOP_DONE', 'This stop is already done.');
     const request = await riderOf(client, stop.request_id);
 
+    if (stop.kind === 'pickup' && !request.rider_confirmed_driver_at) {
+      throw errors.conflict('RIDER_NOT_CONFIRMED', 'Wait for the rider to confirm they are getting into the right car.');
+    }
     if (stop.kind === 'dropoff') {
       const { rows } = await client.query(`SELECT 1 FROM ride_stops WHERE ride_id = $1 AND request_id = $2 AND kind = 'pickup' AND done_at IS NOT NULL AND NOT no_show`, [rideId, stop.request_id]);
       if (rows.length === 0) throw errors.conflict('NOT_PICKED_UP', 'This rider has not been picked up yet.');
@@ -151,6 +155,54 @@ async function noShow({ rideId, stopId, driverId, ip }) {
   });
   realtime.emitToUser(request.rider_id, 'request:update', { requestId: request.request_id, status: 'cancelled' });
   await withTransaction((c) => dispatch.pingRide(c, rideId));
+}
+
+// ---------------------------------------------------------------- the rider checks the driver
+
+/**
+ * Before the ride starts the rider confirms "this is my driver and car". If it does not match, the ride is cancelled
+ * for them and an incident report opens by itself, so the team can look into it.
+ */
+async function confirmDriver({ rideId, riderId, matches, ip }) {
+  const out = await withTransaction(async (client) => {
+    const { rows: mine } = await client.query(`SELECT request_id FROM trip_requests WHERE ride_id = $1 AND rider_id = $2 AND status = 'assigned'`, [rideId, riderId]);
+    if (!mine[0]) throw errors.notFound('Ride not found.');
+    const request = await dispatch.findRequest(client, mine[0].request_id, { forUpdate: true });
+    if (request.status !== 'assigned') throw errors.conflict('NOT_WAITING', 'This ride is already under way.');
+    const { rows: ride } = await client.query('SELECT driver_id FROM rides WHERE ride_id = $1', [rideId]);
+    const driverId = ride[0].driver_id;
+
+    if (matches) {
+      await client.query('UPDATE trip_requests SET rider_confirmed_driver_at = now() WHERE request_id = $1', [request.request_id]);
+      await appendAudit(client, { userId: riderId, action: 'ride.driver_confirmed', entity: 'ride', entityId: rideId, ipAddress: ip, details: { ride_id: rideId, request_id: request.request_id, driver_id: driverId } });
+      return { matches: true, driverId };
+    }
+
+    await dispatch.lockDriver(client, driverId);
+    await dispatch.releaseFromRide(client, request);
+    await client.query(`UPDATE trip_requests SET status = 'cancelled', cancel_reason = 'driver_mismatch' WHERE request_id = $1`, [request.request_id]);
+    const { rows: report } = await client.query(
+      `INSERT INTO incident_reports (reporter_id, reported_user_id, ride_id, category, description)
+       VALUES ($1, $2, $3, 'driver_mismatch', 'The rider said the driver or car did not match what the app showed, and cancelled before getting in.') RETURNING report_id`,
+      [riderId, driverId, rideId],
+    );
+    await appendAudit(client, {
+      userId: riderId,
+      action: 'incident.report',
+      entity: 'incident_report',
+      entityId: report[0].report_id,
+      ipAddress: ip,
+      details: { report_id: report[0].report_id, ride_id: rideId, reporter_id: riderId, reported_user_id: driverId, category: 'driver_mismatch' },
+    });
+    await appendAudit(client, { userId: riderId, action: 'ride.driver_mismatch', entity: 'ride', entityId: rideId, ipAddress: ip, details: { ride_id: rideId, request_id: request.request_id, driver_id: driverId, report_id: report[0].report_id } });
+    await notify(client, { userId: driverId, type: 'ride.cancelled', message: 'The rider cancelled because they could not match you or your car to the app. The team will look into it.', link: '/drive' });
+    await notifyMany(client, await adminIds(client), { type: 'incident.new', message: 'A rider said the driver or car did not match. A report was opened automatically.', link: `/admin?tab=incidents&id=${report[0].report_id}`, email: true });
+    return { matches: false, driverId, requestId: request.request_id };
+  });
+  realtime.emitToUser(riderId, 'request:update', { requestId: out.requestId, status: out.matches ? 'assigned' : 'cancelled' });
+  await withTransaction((c) => dispatch.pingRide(c, rideId));
+  if (!out.matches) await verification.suspendIfUnsafe(out.driverId); // repeated reports can suspend a driver
+  return { matches: out.matches };
 }
 
 // ---------------------------------------------------------------- finishing
@@ -236,9 +288,10 @@ async function liveView({ rideId, userId }) {
   const myStatus = me.status;
   const zones = await zoneNames();
   const driver = people.find((p) => p.role === 'driver');
+  const { rows: dtype } = await pool.query('SELECT driver_type FROM driver_verifications WHERE driver_id = $1', [driver.user_id]);
 
   const { rows: stopRows } = await pool.query(`SELECT ${STOP_COLUMNS} FROM ride_stops s WHERE s.ride_id = $1 ORDER BY s.sequence`, [rideId]);
-  const { rows: reqRows } = await pool.query(`SELECT request_id, dropoff_zone, pickup_label, dropoff_label FROM trip_requests WHERE ride_id = $1`, [rideId]);
+  const { rows: reqRows } = await pool.query(`SELECT request_id, dropoff_zone, pickup_label, dropoff_label, rider_confirmed_driver_at FROM trip_requests WHERE ride_id = $1`, [rideId]);
   const reqById = new Map(reqRows.map((r) => [r.request_id, r]));
   const personByRequest = new Map(people.filter((p) => p.request_id).map((p) => [p.request_id, p]));
 
@@ -262,6 +315,7 @@ async function liveView({ rideId, userId }) {
         lat: isDriver || mine ? s.lat : undefined,
         lng: isDriver || mine ? s.lng : undefined,
         requestId: isDriver ? s.request_id : undefined,
+        riderConfirmed: isDriver && s.kind === 'pickup' ? Boolean(reqById.get(s.request_id)?.rider_confirmed_driver_at) : undefined,
         riderName: isDriver ? who?.full_name : undefined,
         riderPhone: isDriver ? who?.phone_number : undefined,
       };
@@ -279,10 +333,13 @@ async function liveView({ rideId, userId }) {
     ride: { rideId: ride.ride_id, status: ride.status, totalKm: ride.total_km, totalKes: ride.total_cost_kes },
     myRequestId: me.request_id,
     myStatus,
+    confirmedDriver: Boolean(reqById.get(me.request_id)?.rider_confirmed_driver_at),
     driver: {
       userId: driver.user_id,
       firstName: driver.full_name.split(' ')[0],
       fullName: driver.full_name,
+      typeLabel: dtype[0] ? require('../lib/verification').TYPE_LABEL[dtype[0].driver_type] : null,
+      verified: Boolean(dtype[0]),
       rating: Number(driver.avg_rating),
       phoneNumber: isDriver ? undefined : driver.phone_number, // shared once the ride is assigned
       vehicle: { makeModel: ride.make_model, plateNumber: ride.plate_number, colour: ride.colour },
@@ -318,6 +375,7 @@ async function rate({ rideId, raterId, rateeId, stars, tags = [], comment, ip })
       await client.query(`UPDATE users SET avg_rating = (SELECT round(avg(stars), 1) FROM ratings WHERE ratee_id = $1) WHERE user_id = $1`, [rateeId]);
       await appendAudit(client, { userId: raterId, action: 'rating.create', entity: 'ride', entityId: rideId, ipAddress: ip, details: { ride_id: rideId, ratee_id: rateeId, stars, tags } });
     });
+    await verification.suspendIfUnsafe(rateeId);
   } catch (err) {
     if (err.code === PG.UNIQUE_VIOLATION) throw errors.conflict('ALREADY_RATED', 'You have already rated this person for this ride.');
     throw err;
@@ -337,4 +395,4 @@ async function sos({ rideId, userId, ip }) {
   });
 }
 
-module.exports = { arrived, done, noShow, completeRide, settleShare, liveView, rate, sos, legsSoFar, loadParticipants };
+module.exports = { arrived, done, noShow, completeRide, settleShare, liveView, rate, sos, confirmDriver, legsSoFar, loadParticipants };

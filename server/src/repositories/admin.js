@@ -54,8 +54,8 @@ async function dashboard({ from = null, to = null, fuelRate = 24 } = {}, db = po
               (SELECT count(*)::int FROM ride_requests q WHERE ($1::timestamptz IS NULL OR q.created_at >= $1) AND ($2::timestamptz IS NULL OR q.created_at < $2)) AS requests,
               (SELECT count(*)::int FROM bookings b WHERE ($1::timestamptz IS NULL OR b.created_at >= $1) AND ($2::timestamptz IS NULL OR b.created_at < $2)) AS matches,
               (SELECT count(*)::int FROM incident_reports WHERE status <> 'closed') AS open_incidents,
-              (SELECT count(*)::int FROM driver_applications WHERE status = 'pending') AS pending_drivers,
-              (SELECT count(*)::int FROM driver_applications WHERE status = 'approved') AS approved_drivers`,
+              (SELECT count(*)::int FROM driver_verifications WHERE status = 'pending_review' OR recheck_state = 'submitted') AS pending_drivers,
+              (SELECT count(*)::int FROM driver_verifications WHERE status = 'approved') AS approved_drivers`,
       range,
     ),
   ]);

@@ -1,4 +1,4 @@
-const { api, resetDb, createStudent, createAdmin, auth, pool, auditRows } = require('./helpers/testApp');
+const { api, resetDb, createStudent, createAdmin, auth, pool, auditRows, approveAsDriver } = require('./helpers/testApp');
 
 // Zones are seeded data that resetDb keeps, so remove the ones these tests create.
 const cleanZones = () => pool.query("DELETE FROM zones WHERE name IN ('Test Zone', 'Renamed', 'Bad')");
@@ -14,6 +14,7 @@ async function ride() {
   const d = await createStudent({ fullName: 'Dan Driver' });
   const r = await createStudent({ fullName: 'Rita Rider' });
   await api().post('/api/vehicles').set(auth(d.token)).send({ makeModel: 'Toyota Axio', plateNumber: 'KDZ901Z', colour: 'Grey', seatCapacity: 3 }).expect(201);
+  await approveAsDriver(d.user.userId);
   await api().post('/api/driver/online').set(auth(d.token)).send({ lat: GATE.lat, lng: GATE.lng }).expect(200);
   await api().post('/api/requests').set(auth(r.token)).send({ type: 'now', pickup: GATE, dropoff: KASARANI, seats: 1 }).expect(201);
   const offer = (await api().get('/api/driver/state').set(auth(d.token))).body.offer;

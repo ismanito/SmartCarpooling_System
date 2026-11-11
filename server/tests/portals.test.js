@@ -1,13 +1,12 @@
 const request = require('supertest');
-const { resetDb, createAdmin, createStudent, auth, tokenFor } = require('./helpers/testApp');
+const { resetDb, createAdmin, createStudent, auth, tokenFor, approveAsDriver, confirmRider, pool } = require('./helpers/testApp');
 const { createApp } = require('../src/app');
 const { config } = require('../src/config/env');
 const { fakeVerifyIdToken } = require('./helpers/fakeAuth');
 
 beforeEach(resetDb);
 
-// Driver accounts only: rider accounts (students and staff) may not drive.
-const app = request(createApp({ verifyIdToken: fakeVerifyIdToken, config: { ...config, allowDriverSignup: true, studentsCanDrive: false } }));
+const app = request(createApp({ verifyIdToken: fakeVerifyIdToken, config: { ...config, allowDriverSignup: true } }));
 
 const GATE = { lat: -1.2189, lng: 36.8808, label: 'USIU-Africa, Gate A' };
 const KASARANI = { lat: -1.2216, lng: 36.9046, label: 'Kasarani' };
@@ -16,11 +15,9 @@ let n = 0;
 async function approvedDriver() {
   n += 1;
   const token = tokenFor({ uid: `pd-${n}-${Date.now()}`, email: `portal.driver${n}@gmail.com` });
-  const res = await app.post('/api/users').set(auth(token)).send({ fullName: 'Dan Driver', phoneNumber: '0712345678', licenceNumber: 'DL-123456', idNumber: '12345678' }).expect(201);
-  const admin = await createAdmin();
-  const list = (await app.get('/api/admin/drivers?status=pending').set(auth(admin.token))).body.applications;
-  await app.post(`/api/admin/drivers/${list[0].applicationId}/decision`).set(auth(admin.token)).send({ decision: 'approved' }).expect(200);
+  const res = await app.post('/api/users').set(auth(token)).send({ fullName: 'Dan Driver', phoneNumber: '0712345678' }).expect(201);
   await app.post('/api/vehicles').set(auth(token)).send({ makeModel: 'Toyota Axio', plateNumber: `KDP${100 + n}P`, colour: 'Blue', seatCapacity: 3 }).expect(201);
+  await approveAsDriver(res.body.user.userId, { type: 'external', externalEnabled: true });
   return { token, user: res.body.user };
 }
 
@@ -42,12 +39,12 @@ describe('rider accounts: students and staff', () => {
 });
 
 describe('separate portals', () => {
-  it('rider accounts cannot use the driving screens when drivers are separate', async () => {
+  it('an unverified rider cannot use the driving screens', async () => {
     const rider = await createStudent();
-    for (const path of ['/api/driver/state', '/api/driver/dashboard', '/api/vehicles/mine']) {
+    for (const path of ['/api/driver/state', '/api/driver/dashboard']) {
       const res = await app.get(path).set(auth(rider.token));
       expect(res.status).toBe(403);
-      expect(res.body.error.code).toBe('DRIVERS_ONLY');
+      expect(res.body.error.code).toBe('DRIVER_NOT_VERIFIED');
     }
     expect((await app.post('/api/driver/online').set(auth(rider.token)).send({ lat: GATE.lat, lng: GATE.lng })).status).toBe(403);
   });
@@ -70,6 +67,7 @@ describe('dashboards', () => {
     const { ride } = (await app.get('/api/driver/state').set(auth(d.token))).body;
     for (const s of ride.stops) {
       await app.post(`/api/rides/${ride.ride.rideId}/stops/${s.stopId}/arrived`).set(auth(d.token)).expect(204);
+      await confirmRider(s.requestId);
       await app.post(`/api/rides/${ride.ride.rideId}/stops/${s.stopId}/done`).set(auth(d.token)).expect(200);
     }
     await app.post(`/api/rides/${ride.ride.rideId}/complete`).set(auth(d.token)).expect(200);
@@ -97,10 +95,10 @@ describe('driver accounts on demo domains', () => {
   const demoApp = request(createApp({ verifyIdToken: fakeVerifyIdToken, config: { ...config, allowDriverSignup: true, studentsCanDrive: false, demoEmailDomains: ['demo.test'], allowedEmailDomains: ['usiu.ac.ke', 'demo.test'] } }));
 
   it('a demo address can open a driver account when asked, but a real university address cannot', async () => {
-    const form = { fullName: 'Dan Demo', phoneNumber: '0712345678', licenceNumber: 'DL-123456', idNumber: '12345678', accountType: 'driver' };
+    const form = { fullName: 'Dan Demo', phoneNumber: '0712345678', accountType: 'driver' };
     const demo = await demoApp.post('/api/users').set(auth(tokenFor({ uid: 'dd1', email: 'dan@demo.test' }))).send(form).expect(201);
-    expect(demo.body.user).toMatchObject({ role: 'driver', driverStatus: 'pending' });
+    expect(demo.body.user).toMatchObject({ role: 'driver', driverStatus: 'not_started', driverType: 'external' });
     const real = await demoApp.post('/api/users').set(auth(tokenFor({ uid: 'dd2', email: 'real@usiu.ac.ke' }))).send(form);
-    expect(real.status).toBe(400); // a university address gets the student form, which has no licence fields
+    expect(real.status).toBe(400); // a university address gets the student form, which does not take accountType
   });
 });

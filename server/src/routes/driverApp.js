@@ -1,4 +1,5 @@
 const { Router } = require('express');
+const { z } = require('zod');
 const { errors } = require('../lib/errors');
 const { requireAuth } = require('../middleware/auth');
 const { requireRole } = require('../middleware/requireRole');
@@ -10,11 +11,12 @@ const rideOps = require('../services/rideOps');
 
 const authed = [requireAuth(), requireRole('student', 'driver')];
 const me = (req) => ({ userId: req.user.userId, role: req.user.role, driverStatus: req.user.driverStatus });
-const studentsCanDrive = (req) => req.app.locals.config.studentsCanDrive !== false;
 
-/** The driving screens belong to driver accounts. Rider accounts get in only while STUDENTS_CAN_DRIVE is on. */
+/** The driving screens are for approved, verified drivers only. */
 function driversOnly(req, res, next) {
-  if (req.user.role === 'student' && !studentsCanDrive(req)) throw errors.forbidden('DRIVERS_ONLY', 'This area is for driver accounts.');
+  if (req.user.driverStatus !== 'approved') {
+    throw errors.forbidden('DRIVER_NOT_VERIFIED', 'Become a verified driver to use this area.');
+  }
   next();
 }
 
@@ -22,12 +24,12 @@ function driversOnly(req, res, next) {
 const driver = Router();
 driver.use(...authed, driversOnly);
 
-driver.get('/state', async (req, res) => res.json(await driverApp.state(me(req), studentsCanDrive(req))));
+driver.get('/state', async (req, res) => res.json(await driverApp.state(me(req))));
 driver.get('/dashboard', async (req, res) => res.json(await driverApp.dashboard(req.user.userId)));
 driver.get('/history', async (req, res) => res.json(await driverApp.history(req.user.userId)));
 
 driver.post('/online', validateBody(onlineSchema), async (req, res) => {
-  res.json(await driverApp.goOnline({ user: me(req), vehicleId: req.body.vehicleId, lat: req.body.lat, lng: req.body.lng, ip: req.ip, studentsCanDrive: studentsCanDrive(req) }));
+  res.json(await driverApp.goOnline({ user: me(req), lat: req.body.lat, lng: req.body.lng, selfieCheckId: req.body.selfieCheckId, ip: req.ip }));
 });
 driver.post('/offline', async (req, res) => {
   await driverApp.goOffline({ userId: req.user.userId, ip: req.ip });
@@ -68,6 +70,7 @@ rides.post('/:id/ratings', uuidParam('id'), validateBody(rateSchema), async (req
   await rideOps.rate({ rideId: req.params.id, raterId: req.user.userId, rateeId: req.body.rateeId, stars: req.body.stars, tags: req.body.tags, comment: req.body.comment, ip: req.ip });
   res.status(201).json({ stars: req.body.stars });
 });
+rides.post('/:id/confirm-driver', uuidParam('id'), validateBody(z.object({ matches: z.boolean() }).strict()), act('confirm', (req) => rideOps.confirmDriver({ rideId: req.params.id, riderId: req.user.userId, matches: req.body.matches, ip: req.ip })));
 rides.post('/:id/sos', uuidParam('id'), act('sos', (req) => rideOps.sos({ rideId: req.params.id, userId: req.user.userId, ip: req.ip })));
 
 // ---------------------------------------------------------------- paying (/api/ride-shares)

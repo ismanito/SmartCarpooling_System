@@ -3,26 +3,27 @@ const { pool, withTransaction } = require('../db/pool');
 const { errors } = require('../lib/errors');
 const { appendAudit } = require('./audit');
 const dispatch = require('./dispatch');
+const verification = require('./verification');
 const rideOps = require('./rideOps');
 const realtime = require('./realtime');
 
 const STALE_SECONDS = 180;
 
-/** Approved drivers can drive. Rider accounts (students and staff) can too unless STUDENTS_CAN_DRIVE is off. */
-function canDrive(user, studentsCanDrive = true) {
-  if (user.role === 'driver') return user.driverStatus === 'approved';
-  return user.role === 'student' && studentsCanDrive;
+/** Anyone, student, staff or external, may drive once their verification is approved. */
+function canDrive(user) {
+  return user.driverStatus === 'approved';
 }
 
-async function goOnline({ user, vehicleId, lat, lng, ip, studentsCanDrive = true }) {
-  if (!canDrive(user, studentsCanDrive)) throw errors.forbidden('DRIVER_NOT_APPROVED', 'Your driver application has not been approved yet.');
+async function goOnline({ user, lat, lng, selfieCheckId, ip }) {
   return withTransaction(async (client) => {
-    const { rows } = await client.query(
-      `SELECT vehicle_id, make_model, seat_capacity FROM vehicles WHERE owner_id = $1 AND ($2::uuid IS NULL OR vehicle_id = $2) ORDER BY created_at LIMIT 1`,
-      [user.userId, vehicleId || null],
-    );
+    // Approved, every paper still valid, and the vehicle that was verified. Otherwise: no.
+    const v = await verification.assertCanDrive(client, user.userId);
+    if (await verification.selfieRequired(client, user.userId, selfieCheckId)) {
+      throw errors.conflict('SELFIE_REQUIRED', 'Take a quick selfie to go online.');
+    }
+    const { rows } = await client.query('SELECT vehicle_id, make_model, seat_capacity FROM vehicles WHERE vehicle_id = $1 AND owner_id = $2', [v.vehicle_id, user.userId]);
     const vehicle = rows[0];
-    if (!vehicle) throw errors.conflict('NO_VEHICLE', 'Add a vehicle before you go online.');
+    if (!vehicle) throw errors.conflict('NO_VEHICLE', 'Your verified vehicle is missing. Update your verification.');
     const { rows: cur } = await client.query('SELECT active_ride_id FROM driver_status WHERE driver_id = $1 FOR UPDATE', [user.userId]);
     if (cur[0]?.active_ride_id) throw errors.conflict('ON_A_RIDE', 'You are on a ride.');
     await client.query(
@@ -78,7 +79,7 @@ async function dropStaleDrivers() {
 }
 
 /** Everything the driver screen needs in one call. */
-async function state(user, studentsCanDrive = true) {
+async function state(user) {
   const { rows } = await pool.query(
     `SELECT ds.is_online, ds.seats_free, ds.active_ride_id, ds.online_since, v.vehicle_id, v.make_model, v.plate_number, v.colour, v.seat_capacity
        FROM driver_status ds LEFT JOIN vehicles v ON v.vehicle_id = ds.vehicle_id WHERE ds.driver_id = $1`,
@@ -116,7 +117,7 @@ async function state(user, studentsCanDrive = true) {
   const settings = await dispatch.loadSettings();
   return {
     noShowWaitS: settings.noShowWaitS,
-    canDrive: canDrive(user, studentsCanDrive),
+    canDrive: canDrive(user),
     isOnline: Boolean(ds?.is_online),
     seatsFree: ds?.seats_free ?? 0,
     vehicle: ds?.vehicle_id ? { vehicleId: ds.vehicle_id, makeModel: ds.make_model, plateNumber: ds.plate_number, colour: ds.colour, seatCapacity: ds.seat_capacity } : null,

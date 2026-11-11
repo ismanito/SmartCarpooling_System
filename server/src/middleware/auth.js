@@ -55,7 +55,13 @@ function requireAuth({ profile = true, allowUnverified = false } = {}) {
     }
 
     req.auth = { uid: identity.uid, email: identity.email.toLowerCase() };
-    req.user = user ? { userId: user.user_id, role: user.role, driverStatus: user.driver_status || null, profile: user } : null;
+    // Addresses on SENIOR_ADMIN_EMAILS are senior administrators (they alone may approve external drivers).
+    if (user && user.role === 'admin' && user.admin_level !== 'senior_admin' && (req.app.locals.config.seniorAdminEmails || []).includes(identity.email.toLowerCase())) {
+      user = await usersRepo.promoteSenior(user.user_id);
+    }
+    req.user = user
+      ? { userId: user.user_id, role: user.role, adminLevel: user.admin_level, driverStatus: user.driver_status || null, driverType: user.driver_type || null, profile: user }
+      : null;
     next();
   };
 }
