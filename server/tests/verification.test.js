@@ -753,3 +753,19 @@ describe('audit trail', () => {
 // test helper reference so approveAsDriver stays exercised for the dispatch suites
 void approveAsDriver;
 void dispatch;
+
+describe('verification settings', () => {
+  it('lets any admin tune the thresholds, but only a senior admin switch the external track', async () => {
+    const plain = await createAdmin();
+    const senior = await createSeniorAdmin();
+    await app.put('/api/admin/verification-settings').set(auth(plain.token)).send({ min_licence_years: 2, auto_suspend_incidents: 3 }).expect(204);
+    expect((await app.get('/api/admin/verification-settings').set(auth(plain.token))).body).toMatchObject({ settings: { min_licence_years: 2, auto_suspend_incidents: 3, external_drivers_enabled: false }, canToggleExternal: false });
+    expect((await app.put('/api/admin/verification-settings').set(auth(plain.token)).send({ external_drivers_enabled: true })).status).toBe(403);
+    await app.put('/api/admin/verification-settings').set(auth(senior.token)).send({ external_drivers_enabled: true }).expect(204);
+    expect((await app.put('/api/admin/verification-settings').set(auth(senior.token)).send({ random_selfie_check_percent: 500 })).status).toBe(400);
+    expect((await app.put('/api/admin/verification-settings').set(auth(plain.token)).send({ nonsense: 1 })).status).toBe(400);
+    await pool.query(`UPDATE system_settings SET setting_value = '1' WHERE setting_key = 'min_licence_years'`);
+    await pool.query(`UPDATE system_settings SET setting_value = '2' WHERE setting_key = 'auto_suspend_incidents'`);
+    expect((await auditRows()).map((a) => a.action)).toContain('verification_settings.update');
+  });
+});

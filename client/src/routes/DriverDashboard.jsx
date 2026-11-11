@@ -8,12 +8,12 @@ import { api } from '../lib/api.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { Card, Contact, Rating, Route, SectionTitle, StatusBadge, SubItem, SubList, TripLine, formatWhen, plural, useLiveList } from '../components/rides/RideBits.jsx'
 import { PayChip, StatGrid, StatTile, kes } from '../components/payments/PaymentBits.jsx'
-import DriverApplication from './DriverApplication.jsx'
+import DriverVerification from './DriverVerification.jsx'
 
 /** The driver's dashboard: trips, requests waiting for an answer, and the money passengers owe. */
 export default function DriverDashboard() {
   const { profile } = useAuth()
-  if (profile?.role === 'driver' && profile.driverStatus !== 'approved') return <DriverApplication />
+  if (profile?.role === 'driver' && profile.driverStatus !== 'approved') return <DriverVerification />
   return <ApprovedDriverDashboard />
 }
 

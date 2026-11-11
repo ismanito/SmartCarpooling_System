@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router'
+import { NavLink, Outlet, useLocation } from 'react-router'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { Logo } from './Logo.jsx'
 import { NotificationBell } from './NotificationBell.jsx'
@@ -14,6 +14,15 @@ const RIDER_LINKS = [
   { to: '/', label: 'Ride', end: true },
   { to: '/bookings', label: 'My bookings' },
   { to: '/my-rides', label: 'My rides' },
+  { to: '/become-driver', label: 'Become a driver' },
+  { to: '/profile', label: 'Profile' },
+]
+// A student or staff member who has been verified as a driver can switch to driving and back.
+const RIDER_WHO_DRIVE_LINKS = [
+  { to: '/', label: 'Ride', end: true },
+  { to: '/bookings', label: 'My bookings' },
+  { to: '/my-rides', label: 'My rides' },
+  { to: '/drive/dashboard', label: 'Driver mode' },
   { to: '/profile', label: 'Profile' },
 ]
 
@@ -22,15 +31,28 @@ const DRIVER_LINKS = [
   { to: '/drive', label: 'Drive', end: true },
   { to: '/drive/history', label: 'Ride history' },
   { to: '/drive/cost', label: 'Cost shared' },
+  { to: '/drive/ratings', label: 'Ratings', },
+  { to: '/vehicles', label: 'Vehicles' },
+  { to: '/become-driver', label: 'Verification' },
+  { to: '/drive/safety', label: 'Safety' },
+  { to: '/profile', label: 'Profile' },
+]
+// The same menu for a rider in driver mode: the dashboard lives at /drive/dashboard and there is a way back.
+const DRIVER_MODE_LINKS = [
+  { to: '/', label: 'Rider mode', end: true },
+  { to: '/drive/dashboard', label: 'Dashboard', end: true },
+  { to: '/drive', label: 'Drive', end: true },
+  { to: '/drive/history', label: 'Ride history' },
+  { to: '/drive/cost', label: 'Cost shared' },
   { to: '/drive/ratings', label: 'Ratings' },
   { to: '/vehicles', label: 'Vehicles' },
-  { to: '/drive/safety', label: 'Safety' },
+  { to: '/become-driver', label: 'Verification' },
   { to: '/profile', label: 'Profile' },
 ]
 
 // Until a driver is approved they see their application, their vehicle and their profile.
 const PENDING_DRIVER_LINKS = [
-  { to: '/', label: 'My application', end: true },
+  { to: '/', label: 'Verification', end: true },
   { to: '/vehicles', label: 'Vehicles' },
   { to: '/profile', label: 'Profile' },
 ]
@@ -40,8 +62,15 @@ const ADMIN_LINKS = [
   { to: '/profile', label: 'Profile' },
 ]
 
-function portalFor(profile) {
+function portalFor(profile, path) {
   if (profile?.role === 'admin') return { id: 'admin', label: 'Admin', chip: 'bg-coral', links: ADMIN_LINKS }
+  const verified = profile?.driverStatus === 'approved'
+  if (profile?.role === 'student' && verified) {
+    const inDriverMode = path.startsWith('/drive') || path.startsWith('/vehicles')
+    return inDriverMode
+      ? { id: 'driver', label: 'Driver mode', chip: 'bg-mint', links: DRIVER_MODE_LINKS, sidebar: true }
+      : { id: 'rider', label: profile.personType === 'staff' ? 'Staff' : 'Student', chip: 'bg-gold', links: RIDER_WHO_DRIVE_LINKS }
+  }
   if (profile?.role === 'driver') {
     return { id: 'driver', label: 'Driver', chip: 'bg-mint', links: profile.driverStatus === 'approved' ? DRIVER_LINKS : PENDING_DRIVER_LINKS, sidebar: true }
   }
@@ -55,7 +84,8 @@ const sideLink = ({ isActive }) =>
 
 export default function AppShell() {
   const { profile, logOut } = useAuth()
-  const portal = portalFor(profile)
+  const { pathname } = useLocation()
+  const portal = portalFor(profile, pathname)
 
   return (
     <div className="flex min-h-dvh flex-col pb-[env(safe-area-inset-bottom)]">

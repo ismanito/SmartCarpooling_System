@@ -7,10 +7,9 @@ import { Alert } from '../components/ui/Panel.jsx'
 import { Spinner } from '../components/ui/Spinner.jsx'
 import { LiveMap } from '../components/ride/LiveMap.jsx'
 import { Avatar, MapStage, Sheet, Stars, kes, useNow } from '../components/ride/bits.jsx'
-import { useAuth } from '../context/AuthContext.jsx'
 import { useLive } from '../hooks/useLive.js'
 import { api } from '../lib/api.js'
-import DriverApplication from './DriverApplication.jsx'
+import { LiveSelfie } from '../components/verification/LiveSelfie.jsx'
 
 const SEND_MS = 6000
 const DEMO_TOOLS = import.meta.env.VITE_DEMO_TOOLS === 'true'
@@ -86,8 +85,7 @@ function useShareLocation(online, demoSpot) {
 }
 
 export default function DriverApp() {
-  const { profile } = useAuth()
-  if (profile?.role === 'driver' && profile.driverStatus !== 'approved') return <DriverApplication />
+  // Only approved drivers reach this page: the route sends everyone else to the verification page.
   return <Driving />
 }
 
@@ -127,12 +125,22 @@ function Driving() {
     }
   }
 
-  const goOnline = async () => {
+  const [selfieOpen, setSelfieOpen] = useState(false)
+  const goOnline = async (selfieCheckId) => {
     setConsent(false)
-    await act(async () => {
+    setBusy(true)
+    setProblem(null)
+    try {
       const here = demoSpot || (await currentPosition())
-      await api.goOnline({ lat: here.lat, lng: here.lng, ...(st.vehicle?.vehicleId ? { vehicleId: st.vehicle.vehicleId } : {}) })
-    })
+      await api.goOnline({ lat: here.lat, lng: here.lng, ...(selfieCheckId ? { selfieCheckId } : {}) })
+      await reload()
+    } catch (err) {
+      // Now and then we ask for a quick live selfie before going online, so nobody else can use a driver's account.
+      if (err.code === 'SELFIE_REQUIRED') setSelfieOpen(true)
+      else setProblem(err.message)
+    } finally {
+      setBusy(false)
+    }
   }
 
   const markers = useMemo(() => {
@@ -211,7 +219,33 @@ function Driving() {
         )}
       </MapStage>
 
-      <ConfirmDialog open={consent} title="Go online?" confirmLabel="Go online" isLoading={busy} onConfirm={goOnline} onCancel={() => setConsent(false)}>
+      {selfieOpen && (
+        <div className="fixed inset-0 z-[1000] overflow-y-auto bg-paper p-4">
+          <div className="mx-auto max-w-md space-y-4">
+            <h2 className="font-display text-3xl font-semibold tracking-wide uppercase">Quick selfie</h2>
+            <p className="text-sm text-ink/85">To keep riders safe we sometimes check that you are the verified driver. Take a photo now, then you go online.</p>
+            <LiveSelfie
+              busy={busy}
+              prompts={['Look straight at the camera']}
+              onCancel={() => setSelfieOpen(false)}
+              onDone={async (files) => {
+                setBusy(true)
+                try {
+                  const { checkId } = await api.recheckSelfie(files[0])
+                  setSelfieOpen(false)
+                  await goOnline(checkId)
+                } catch (err) {
+                  setProblem(err.message)
+                  setSelfieOpen(false)
+                } finally {
+                  setBusy(false)
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
+      <ConfirmDialog open={consent} title="Go online?" confirmLabel="Go online" isLoading={busy} onConfirm={() => goOnline()} onCancel={() => setConsent(false)}>
         While you are online, RideMate shares your position with the riders you are matched with, and checks it every few seconds. It is never kept as a history, and it stops when you go offline. You are not a taxi: you are sharing a journey you were making anyway.
       </ConfirmDialog>
 
@@ -328,8 +362,9 @@ function ActiveRide({ st, act, onComplete, busy }) {
                   ) : (
                     <>
                       <p role="status" className="text-sm text-ink">Waiting for {s.riderName?.split(' ')[0]}: {waitLeft > 0 ? fmt(waitLeft) : 'wait is over'}</p>
+                      {!s.riderConfirmed && <p className="rounded-(--radius-control) bg-paper p-2 text-sm text-ink">Waiting for {s.riderName?.split(' ')[0]} to confirm on their phone that you are their driver and car. You can pick them up once they have.</p>}
                       <div className="grid grid-cols-2 gap-2">
-                        <Button disabled={busy} onClick={() => setConfirmPick(s)}>Picked up</Button>
+                        <Button disabled={busy || !s.riderConfirmed} onClick={() => setConfirmPick(s)}>Picked up</Button>
                         <Button variant="secondary" disabled={busy || waitLeft > 0} onClick={() => act(() => api.stopStep(rideId, s.stopId, 'no-show'))}>No-show</Button>
                       </div>
                     </>

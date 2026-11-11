@@ -136,6 +136,43 @@ admin.post('/selfie-checks/:id', uuidParam('id'), validateBody(z.object({ status
   res.status(204).end();
 });
 
+// Verification settings. Switching the external track on or off is for senior administrators only.
+const LIMITS = {
+  min_licence_years: [0, 20], expiry_warning_days: [1, 90], recheck_months: [1, 36], doc_retention_days: [1, 365],
+  auto_suspend_rating: [1, 5], auto_suspend_min_ratings: [1, 100], auto_suspend_incidents: [1, 20], random_selfie_check_percent: [0, 100],
+};
+admin.get('/verification-settings', async (req, res) => {
+  const s = await verification.loadSettings();
+  res.json({
+    settings: { external_drivers_enabled: s.externalEnabled, min_licence_years: s.minLicenceYears, expiry_warning_days: s.warningDays, recheck_months: s.recheckMonths, doc_retention_days: s.retentionDays, auto_suspend_rating: s.autoSuspendRating, auto_suspend_min_ratings: s.autoSuspendMinRatings, auto_suspend_incidents: s.autoSuspendIncidents, random_selfie_check_percent: s.selfiePercent },
+    limits: LIMITS,
+    canToggleExternal: req.user.adminLevel === 'senior_admin',
+  });
+});
+const settingsSchema = z
+  .object({ external_drivers_enabled: z.boolean().optional(), ...Object.fromEntries(Object.entries(LIMITS).map(([k, [lo, hi]]) => [k, z.coerce.number().min(lo, `Must be at least ${lo}`).max(hi, `Must be at most ${hi}`).optional()])) })
+  .strict()
+  .refine((v) => Object.values(v).some((x) => x !== undefined), { message: 'Change at least one setting' });
+admin.put('/verification-settings', validateBody(settingsSchema), async (req, res) => {
+  if (req.body.external_drivers_enabled !== undefined && req.user.adminLevel !== 'senior_admin') {
+    throw errors.forbidden('SENIOR_ADMIN_REQUIRED', 'Only a senior administrator can switch external drivers on or off.');
+  }
+  const { withTransaction } = require('../db/pool');
+  const { appendAudit } = require('../services/audit');
+  const changes = Object.entries(req.body).filter(([, v]) => v !== undefined);
+  await withTransaction(async (client) => {
+    for (const [key, value] of changes) {
+      await client.query(
+        `INSERT INTO system_settings (setting_key, setting_value, updated_by) VALUES ($1, $2, $3)
+         ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_by = EXCLUDED.updated_by, updated_at = now()`,
+        [key, String(value), req.user.userId],
+      );
+    }
+    await appendAudit(client, { userId: req.user.userId, action: 'verification_settings.update', entity: 'system_settings', ipAddress: req.ip, details: Object.fromEntries(changes) });
+  });
+  res.status(204).end();
+});
+
 // ---------------------------------------------------------------- public: signed document links, and the QR page
 const pub = Router();
 const limiter = rateLimit({

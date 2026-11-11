@@ -29,7 +29,8 @@ export class ApiError extends Error {
 
 async function request(path, { method = 'GET', body, auth = true } = {}) {
   const headers = { Accept: 'application/json' }
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  const isForm = typeof FormData !== 'undefined' && body instanceof FormData // file uploads: the browser sets the type
+  if (body !== undefined && !isForm) headers['Content-Type'] = 'application/json'
   if (auth) {
     const user = getFirebaseAuth().currentUser
     if (!user) throw new ApiError(401, 'AUTH_MISSING_TOKEN', 'Sign in to continue.')
@@ -48,7 +49,7 @@ async function request(path, { method = 'GET', body, auth = true } = {}) {
     res = await fetch(`${BASE_URL}${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
     })
   } catch {
     throw new ApiError(0, 'NETWORK_ERROR', 'Could not reach RideMate. Check your connection and try again.')
@@ -92,10 +93,6 @@ export const api = {
   checkDomain: (email) => request('/auth/check-domain', { method: 'POST', body: { email }, auth: false }),
   startSession: () => request('/auth/session', { method: 'POST' }),
   demoVerify: () => request('/auth/demo-verify', { method: 'POST' }),
-  driverApplication: () => request('/drivers/application'),
-  reapplyDriver: (body) => request('/drivers/application', { method: 'POST', body }),
-  adminDrivers: (status) => request(`/admin/drivers${qs({ status })}`),
-  adminDriverDecision: (id, body) => request(`/admin/drivers/${id}/decision`, { method: 'POST', body }),
   getMe: () => request('/users/me'),
   createProfile: (profile) => request('/users', { method: 'POST', body: profile }),
   updateProfile: (changes) => request('/users/me', { method: 'PUT', body: changes }),
@@ -119,6 +116,40 @@ export const api = {
   completeOffer: (id) => request(`/rides/offers/${id}/complete`, { method: 'POST' }),
   rateBooking: (id, stars) => request(`/rides/bookings/${id}/rate`, { method: 'POST', body: { stars } }),
 
+  // Driver verification
+  verification: () => request('/driver/verification'),
+  startVerification: (body) => request('/driver/verification/start', { method: 'POST', body }),
+  saveVerificationDetails: (body) => request('/driver/verification/details', { method: 'PUT', body }),
+  uploadVerificationDoc: (docType, file, capturedLive = false) => {
+    const form = new FormData()
+    form.append('docType', docType)
+    form.append('capturedLive', String(capturedLive))
+    form.append('file', file, file.name || `${docType}.jpg`)
+    return request('/driver/verification/documents', { method: 'POST', body: form })
+  },
+  submitVerification: () => request('/driver/verification/submit', { method: 'POST' }),
+  recheckSelfie: (file) => {
+    const form = new FormData()
+    form.append('file', file, file.name || 'selfie.jpg')
+    return request('/driver/verification/recheck-selfie', { method: 'POST', body: form })
+  },
+  setAllowExternal: (allowExternalDrivers) => request('/users/me/settings', { method: 'PUT', body: { allowExternalDrivers } }),
+  confirmDriver: (rideId, matches) => request(`/rides/${rideId}/confirm-driver`, { method: 'POST', body: { matches } }),
+  publicDriver: (token) => request(`/public/driver/${encodeURIComponent(token)}`, { auth: false }),
+  adminVerifications: (status) => request(`/admin/verifications${qs({ status })}`),
+  adminVerification: (id) => request(`/admin/verifications/${id}`),
+  adminVerificationCheck: (id, body) => request(`/admin/verifications/${id}/checks`, { method: 'POST', body }),
+  adminInPerson: (id, body) => request(`/admin/verifications/${id}/in-person`, { method: 'POST', body }),
+  adminApproveVerification: (id) => request(`/admin/verifications/${id}/approve`, { method: 'POST' }),
+  adminRejectVerification: (id, reason) => request(`/admin/verifications/${id}/reject`, { method: 'POST', body: { reason } }),
+  adminSuspendVerification: (id, reason) => request(`/admin/verifications/${id}/suspend`, { method: 'POST', body: { reason } }),
+  adminReinstateVerification: (id) => request(`/admin/verifications/${id}/reinstate`, { method: 'POST' }),
+  adminDocumentUrl: (docId) => request(`/admin/documents/${docId}/url`),
+  adminSelfieChecks: (status) => request(`/admin/selfie-checks${qs({ status })}`),
+  adminReviewSelfie: (id, status) => request(`/admin/selfie-checks/${id}`, { method: 'POST', body: { status } }),
+  adminVerificationSettings: () => request('/admin/verification-settings'),
+  adminSaveVerificationSettings: (body) => request('/admin/verification-settings', { method: 'PUT', body }),
+
   // Ride Now / Book
   estimate: (pickup, dropoff) => request('/requests/estimate', { method: 'POST', body: { pickup, dropoff } }),
   createRequest2: (body) => request('/requests', { method: 'POST', body }),
@@ -130,6 +161,7 @@ export const api = {
   requestHistory: () => request('/requests/history'),
   driverHistory: () => request('/driver/history'),
   goOnline: (body) => request('/driver/online', { method: 'POST', body }),
+  goOnlineVerified: (body) => request('/driver/online', { method: 'POST', body }),
   goOffline: () => request('/driver/offline', { method: 'POST' }),
   sendDriverLocation: (body) => request('/driver/location', { method: 'POST', body }),
   acceptOffer: (id) => request(`/offers/${id}/accept`, { method: 'POST' }),

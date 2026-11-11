@@ -22,14 +22,20 @@ import MyRides from './routes/MyRides.jsx'
 import DriverApp from './routes/DriverApp.jsx'
 import Bookings from './routes/Bookings.jsx'
 import HomeByRole from './routes/HomeByRole.jsx'
+import DriverVerification from './routes/DriverVerification.jsx'
+import DriverSticker from './routes/DriverSticker.jsx'
+import PublicDriver from './routes/PublicDriver.jsx'
 import RiderHistory from './routes/RiderHistory.jsx'
 import DriverPages from './routes/DriverPages.jsx'
+import DriverHome from './routes/DriverHome.jsx'
 import RideDetails from './routes/RideDetails.jsx'
 
 // ProtectedRoute renders <Outlet />, so it is used as a layout route around its pages.
 export default function App() {
   return (
     <Routes>
+      {/* The page behind the windscreen sticker's QR code. Open to everyone. */}
+      <Route path="/verified/:token" element={<PublicDriver />} />
       <Route element={<AuthLayout />}>
         <Route element={<ProtectedRoute need="guest" />}>
           <Route path="/login" element={<Login />} />
@@ -55,12 +61,16 @@ export default function App() {
             <Route path="/bookings" element={<Bookings />} />
             <Route path="/my-rides" element={<RiderHistory />} />
           </Route>
+          {/* Anyone (student, staff or external) becomes a driver here, and checks where their verification stands. */}
+          <Route path="/become-driver" element={<DriverVerification />} />
           {/* Driver portal */}
           <Route element={<DriverArea />}>
             <Route path="/vehicles" element={<Vehicles />} />
           </Route>
           <Route element={<DriverArea needApproval />}>
             <Route path="/drive" element={<DriverApp />} />
+            <Route path="/drive/dashboard" element={<DriverHome />} />
+            <Route path="/drive/sticker" element={<DriverSticker />} />
             <Route path="/drive/:section" element={<DriverPages />} />
           </Route>
           {/* Classic carpool (deprecated): drivers post trips and riders search them. Kept until you confirm removal. */}

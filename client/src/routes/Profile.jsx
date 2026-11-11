@@ -9,9 +9,10 @@ import { applyFieldErrors } from '../lib/api.js'
 import { FACULTIES } from '../constants/faculties.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { Rating } from '../components/rides/RideBits.jsx'
+import { api } from '../lib/api.js'
 
 export default function Profile() {
-  const { profile, updateProfile } = useAuth()
+  const { profile, updateProfile, reloadProfile } = useAuth()
   const [serverError, setServerError] = useState(null)
   const [saved, setSaved] = useState(false)
   const isStudent = profile?.role === 'student'
@@ -70,6 +71,29 @@ export default function Profile() {
           Save changes
         </Button>
       </form>
+      {isStudent && (
+        <div className="mt-6 border-t border-ink/15 pt-5">
+          <label className="flex min-h-11 items-start gap-3 text-sm text-ink">
+            <input
+              type="checkbox"
+              checked={profile.allowExternalDrivers !== false}
+              onChange={async (e) => {
+                try {
+                  await api.setAllowExternal(e.target.checked)
+                  await reloadProfile()
+                } catch (err) {
+                  setServerError(err.message)
+                }
+              }}
+              className="mt-0.5 size-5"
+            />
+            <span>
+              <span className="block font-medium">Allow external drivers</span>
+              <span className="block text-ink/85">Drivers who are not students or staff, but have been checked by the RideMate team. Turn this off to be matched only with student and staff drivers.</span>
+            </span>
+          </label>
+        </div>
+      )}
     </Panel>
   )
 }

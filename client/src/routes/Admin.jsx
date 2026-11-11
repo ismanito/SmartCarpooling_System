@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router'
 import { ShieldCheck } from 'lucide-react'
-import { Analytics, Dashboard, DriverApplications, Incidents } from './AdminSections.jsx'
+import { Analytics, Dashboard, Incidents } from './AdminSections.jsx'
+import { Verification } from './AdminVerification.jsx'
 import { DispatchTools, LiveOps, Zones } from './AdminDispatch.jsx'
 import { Button } from '../components/ui/Button.jsx'
 import { TextField } from '../components/ui/Field.jsx'
@@ -15,7 +16,7 @@ import { PayChip, kes } from '../components/payments/PaymentBits.jsx'
 const TABS = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'users', label: 'Users' },
-  { id: 'drivers', label: 'Driver applications' },
+  { id: 'verification', label: 'Driver verification' },
   { id: 'live', label: 'Live map' },
   { id: 'incidents', label: 'Incident reports' },
   { id: 'zones', label: 'Zones' },
@@ -57,7 +58,7 @@ export default function Admin() {
         <div className="min-w-0">
           {tab === 'dashboard' && <Dashboard />}
           {tab === 'users' && <People myId={profile.userId} />}
-          {tab === 'drivers' && <DriverApplications />}
+          {tab === 'verification' && <Verification />}
           {tab === 'live' && <LiveOps />}
           {tab === 'zones' && <Zones />}
           {tab === 'dispatch' && <DispatchTools />}

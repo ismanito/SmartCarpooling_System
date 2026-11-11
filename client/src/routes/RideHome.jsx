@@ -424,9 +424,23 @@ function TripSheet({ request, ride, onChange, onDismiss, onRetry, onBookLater })
         <p className="text-sm text-ink">{driver.vehicle.colour} {driver.vehicle.makeModel}</p>
         <BigPlate plate={driver.vehicle.plateNumber} />
       </div>
+      <p className="flex flex-wrap items-center gap-2 text-xs text-ink/85">
+        {driver.verified && <span className="inline-flex items-center rounded-(--radius-chip) bg-ink px-1.5 py-0.5 font-medium text-gold">✓ Verified</span>}
+        {driver.typeLabel}
+      </p>
       <p role="status" className="text-sm font-medium text-ink">
         {onTrip ? 'You are on your way.' : nextStop?.arrivedAt ? 'Your driver has arrived.' : 'Your driver is on the way.'}
       </p>
+      {!onTrip && !ride.confirmedDriver && (
+        <div className="space-y-2 rounded-(--radius-control) border border-ink bg-paper p-3">
+          <p className="text-sm font-medium text-ink">Before you get in: is this your driver and car?</p>
+          <p className="text-sm text-ink/85">Check that {driver.firstName} and the number plate match. You must confirm before the ride can start.</p>
+          <div className="grid grid-cols-2 gap-2">
+            <Button size="sm" isLoading={busy} onClick={async () => { setBusy(true); try { await api.confirmDriver(ride.ride.rideId, true); onChange() } catch (err) { setNote(err.message) } finally { setBusy(false) } }}>This is my driver and car</Button>
+            <Button size="sm" variant="danger" disabled={busy} onClick={async () => { setBusy(true); try { await api.confirmDriver(ride.ride.rideId, false); setNote('The ride was cancelled and the RideMate team has been told.'); onChange() } catch (err) { setNote(err.message) } finally { setBusy(false) } }}>Doesn’t match</Button>
+          </div>
+        </div>
+      )}
       {ride.pooled && (
         <p className="rounded-(--radius-control) bg-paper p-3 text-sm text-ink">
           Sharing with {ride.pooledWith.length} other student{ride.pooledWith.length === 1 ? '' : 's'} going to {ride.pooledWith.map((p) => p.zone).join(' and ')}. Your fare is split for the part of the road you share.

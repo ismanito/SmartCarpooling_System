@@ -10,12 +10,12 @@ import { StatGrid, StatTile } from '../components/payments/PaymentBits.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLive } from '../hooks/useLive.js'
 import { api } from '../lib/api.js'
-import DriverApplication from './DriverApplication.jsx'
+import DriverVerification from './DriverVerification.jsx'
 
 /** The driver's own dashboard: status, this week, money to collect, recent rides and vehicle. */
 export default function DriverHome() {
   const { profile } = useAuth()
-  if (profile?.driverStatus !== 'approved') return <DriverApplication />
+  if (profile?.driverStatus !== 'approved') return <DriverVerification />
   return <Dashboard />
 }
 
