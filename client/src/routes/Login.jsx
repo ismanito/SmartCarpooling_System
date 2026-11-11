@@ -7,11 +7,11 @@ import { Field, TextField } from '../components/ui/Field.jsx'
 import { Panel, Alert, PageTitle } from '../components/ui/Panel.jsx'
 import { loginSchema } from '../lib/schemas.js'
 import { firebaseMessage } from '../lib/firebaseErrors.js'
-import { signInWithEmailAndPassword } from 'firebase/auth'
-import { getFirebaseAuth } from '../lib/firebase.js'
+import { useAuth } from '../context/AuthContext.jsx'
 
 export default function Login() {
   const navigate = useNavigate()
+  const { logIn } = useAuth()
   const [serverError, setServerError] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -28,23 +28,23 @@ export default function Login() {
     setServerError(null)
     setIsLoading(true)
     try {
-      await signInWithEmailAndPassword(getFirebaseAuth(), data.email, data.password)
-      navigate('/')
+      const { verified } = await logIn(data.email, data.password)
+      navigate(verified ? '/' : '/verify-email')
     } catch (err) {
-      setServerError(firebaseMessage(err))
+      setServerError(err?.name === 'ApiError' ? err.message : firebaseMessage(err))
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <Panel className="w-full max-w-md mx-auto mt-10">
+    <Panel className="w-full max-w-md">
       <PageTitle className="mb-6">Welcome back</PageTitle>
       {serverError && <Alert tone="error">{serverError}</Alert>}
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <Field
-          label="University email"
-          hint="Sign in with your university email address"
+          label="Email"
+          hint="The email you signed up with"
           error={errors.email?.message}
         >
           {({ aria }) => (
@@ -69,6 +69,11 @@ export default function Login() {
             />
           )}
         </Field>
+        <p className="text-right text-sm">
+          <Link to="/forgot-password" className="text-ink underline underline-offset-4">
+            Forgot your password?
+          </Link>
+        </p>
         <Button variant="primary" type="submit" fullWidth isLoading={isLoading} disabled={isLoading}>
           Sign in
         </Button>

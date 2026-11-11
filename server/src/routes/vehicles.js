@@ -3,13 +3,15 @@ const { withTransaction } = require('../db/pool');
 const { errors, PG } = require('../lib/errors');
 const { changedFields } = require('../lib/changes');
 const { requireAuth } = require('../middleware/auth');
+const { requireRole } = require('../middleware/requireRole');
 const { validateBody, uuidParam } = require('../middleware/validate');
 const { createVehicleSchema, updateVehicleSchema } = require('../schemas/vehicle');
 const { appendAudit } = require('../services/audit');
 const vehiclesRepo = require('../repositories/vehicles');
+const ridesRepo = require('../repositories/rides');
 
 const router = Router();
-router.use(requireAuth());
+router.use(requireAuth(), requireRole('student', 'driver'));
 
 function plateConflict(err) {
   if (err.code === PG.UNIQUE_VIOLATION) {
@@ -74,6 +76,9 @@ router.delete('/:id', uuidParam('id'), async (req, res) => {
   await withTransaction(async (client) => {
     const current = await vehiclesRepo.findOwned(client, req.params.id, req.user.userId);
     if (!current) throw errors.notFound('Vehicle not found.');
+    if ((await ridesRepo.countActiveOffersForVehicle(client, current.vehicle_id)) > 0) {
+      throw errors.conflict('VEHICLE_IN_USE', 'This vehicle has upcoming ride offers. Cancel them first.');
+    }
     await vehiclesRepo.remove(client, req.params.id, req.user.userId);
     await appendAudit(client, {
       userId: req.user.userId,

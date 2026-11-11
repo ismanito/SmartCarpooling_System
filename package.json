@@ -5,10 +5,18 @@
   "scripts": {
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
-    "emulators": "firebase emulators:start --only auth --project demo-ridemate",
+    "emulators": "firebase emulators:start --only auth --project demo-ridemate --import=./.emulator-data --export-on-exit",
+    "dev:live": "concurrently -n api,web,match -c cyan,magenta,green \"npm run dev:server\" \"npm run dev:client\" \"npm run dev:matcher\"",
     "dev:server": "npm --prefix server run dev",
     "dev:client": "npm --prefix client run dev",
-    "dev": "concurrently -n auth,api,web -c yellow,cyan,magenta \"npm run emulators\" \"npm run dev:server\" \"npm run dev:client\"",
-    "test": "npm --prefix server test && npm --prefix client test"
+    "dev": "concurrently -n auth,api,web,match -c yellow,cyan,magenta,green \"npm run emulators\" \"npm run dev:server\" \"npm run dev:client\" \"npm run dev:matcher\"",
+    "test": "npm --prefix server test && npm --prefix client test && npm run test:matcher",
+    "setup:matcher": "node matcher/run.js setup",
+    "dev:matcher": "node matcher/run.js dev",
+    "test:matcher": "node matcher/run.js test"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.6",
+    "firebase-tools": "^15.34.2"
   }
 }

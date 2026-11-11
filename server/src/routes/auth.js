@@ -1,7 +1,8 @@
 const { Router } = require('express');
 const { rateLimit } = require('express-rate-limit');
 const { withTransaction } = require('../db/pool');
-const { emailDomain, isAllowedEmail } = require('../lib/emailDomain');
+const { emailDomain, canUseApp, isAdminEmail, emailKind } = require('../lib/emailDomain');
+const { errors } = require('../lib/errors');
 const { requireAuth } = require('../middleware/auth');
 const { validateBody } = require('../middleware/validate');
 const { checkDomainSchema } = require('../schemas/user');
@@ -28,9 +29,13 @@ router.get('/domains', publicLimiter, (req, res) => {
 
 /** Public: whether an email's domain may register. */
 router.post('/check-domain', publicLimiter, validateBody(checkDomainSchema), (req, res) => {
-  const { allowedEmailDomains } = req.app.locals.config;
+  const { allowedEmailDomains, adminEmails = [], allowDriverSignup = false, demoEmailDomains = [] } = req.app.locals.config;
+  const kind = emailKind(req.body.email, req.app.locals.config);
   res.json({
-    allowed: isAllowedEmail(req.body.email, allowedEmailDomains),
+    allowed: canUseApp(req.body.email, allowedEmailDomains, adminEmails, allowDriverSignup),
+    staff: isAdminEmail(req.body.email, adminEmails),
+    kind, // 'student' | 'driver' | 'admin' | null
+    demo: kind === 'student' && demoEmailDomains.includes(emailDomain(req.body.email)),
     domain: emailDomain(req.body.email),
     allowedDomains: allowedEmailDomains,
   });
@@ -53,6 +58,29 @@ router.post('/session', requireAuth({ profile: false }), async (req, res) => {
     }),
   );
   res.json({ user: usersRepo.toApi(profile), needsProfile: !profile });
+});
+
+/**
+ * Demo accounts only: marks the signed-in person's email as verified without an inbox.
+ * Works only for domains listed in DEMO_EMAIL_DOMAINS, which should stay empty in production.
+ */
+router.post('/demo-verify', requireAuth({ profile: false, allowUnverified: true }), async (req, res) => {
+  const { demoEmailDomains = [] } = req.app.locals.config;
+  if (!demoEmailDomains.includes(emailDomain(req.auth.email))) {
+    throw errors.forbidden('DEMO_NOT_ALLOWED', 'Demo verification is not available for this email address.');
+  }
+  await req.app.locals.markEmailVerified(req.auth.uid);
+  await withTransaction((client) =>
+    appendAudit(client, {
+      userId: req.user?.userId ?? null,
+      action: 'auth.demo_verify',
+      entity: 'user',
+      entityId: req.user?.userId ?? req.auth.uid,
+      ipAddress: req.ip,
+      details: { firebase_uid: req.auth.uid, domain: emailDomain(req.auth.email) },
+    }),
+  );
+  res.json({ verified: true });
 });
 
 module.exports = router;

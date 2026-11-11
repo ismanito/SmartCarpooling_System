@@ -1,0 +1,9 @@
+{
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "https://YOUR-RIDEMATE-API.onrender.com/api/$1" },
+    { "source": "/((?!sw\.js|manifest\.webmanifest|assets/|.*\.(?:png|svg|ico)$).*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    { "source": "/sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
+  ]
+}

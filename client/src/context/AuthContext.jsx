@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
@@ -8,7 +8,7 @@ import {
   signOut,
 } from 'firebase/auth'
 import { getFirebaseAuth } from '../lib/firebase'
-import { api, ApiError } from '../lib/api'
+import { api, ApiError, DEAD_SESSION_CODES } from '../lib/api'
 import { markVerificationSent } from '../hooks/useResendCooldown'
 
 export const AuthContext = createContext(null)
@@ -39,6 +39,18 @@ export function AuthProvider({ children }) {
     const auth = getFirebaseAuth()
     return onAuthStateChanged(auth, async (user) => {
       setStatus('loading')
+      if (user) {
+        try {
+          // Asks Firebase whether the account still exists; a cached token alone can look valid for up to an hour.
+          await user.reload()
+          await user.getIdToken()
+        } catch (err) {
+          if (DEAD_SESSION_CODES.has(err?.code)) {
+            await signOut(auth) // fires this listener again with user = null
+            return
+          }
+        }
+      }
       setFirebaseUser(user)
       setEmailVerified(Boolean(user?.emailVerified))
       if (user?.emailVerified) await loadProfile()
@@ -56,12 +68,18 @@ export function AuthProvider({ children }) {
   }, [])
 
   const signUp = useCallback(async (email, password) => {
-    const { allowed } = await api.checkDomain(email)
-    if (!allowed) throw new ApiError(403, 'AUTH_DOMAIN_NOT_ALLOWED', 'Use your university email to create an account.')
+    const { allowed, demo } = await api.checkDomain(email)
+    if (!allowed) throw new ApiError(403, 'AUTH_DOMAIN_NOT_ALLOWED', 'Use your university email to create a student account, or any email to apply as a driver.')
     const { user } = await createUserWithEmailAndPassword(getFirebaseAuth(), email, password)
+    if (demo) {
+      // Demo accounts have no real inbox: the server verifies them, then we pick that up.
+      await api.demoVerify()
+      await checkVerificationRef.current()
+      return { user, verified: true }
+    }
     await sendEmailVerification(user)
     markVerificationSent(user.uid)
-    return user
+    return { user, verified: false }
   }, [])
 
   const logIn = useCallback(
@@ -86,6 +104,8 @@ export function AuthProvider({ children }) {
     markVerificationSent(user.uid)
   }, [])
 
+  const checkVerificationRef = useRef(async () => false)
+
   /** Re-reads verification state from Firebase. Returns true once the email is verified. */
   const checkVerification = useCallback(async () => {
     const user = getFirebaseAuth().currentUser
@@ -97,6 +117,10 @@ export function AuthProvider({ children }) {
     await startSession()
     return true
   }, [startSession])
+
+  useEffect(() => {
+    checkVerificationRef.current = checkVerification
+  }, [checkVerification])
 
   const sendReset = useCallback((email) => sendPasswordResetEmail(getFirebaseAuth(), email), [])
 

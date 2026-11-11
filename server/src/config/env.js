@@ -16,6 +16,15 @@ const schema = z.object({
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   TEST_DATABASE_URL: z.string().optional(),
   ALLOWED_EMAIL_DOMAINS: z.string().min(1, 'ALLOWED_EMAIL_DOMAINS is required'),
+  ADMIN_EMAILS: z.string().optional().default(''),
+  ALLOW_DRIVER_SIGNUP: boolFromString,
+  DEMO_EMAIL_DOMAINS: z.string().optional().default(''),
+  SMTP_HOST: z.string().optional().default(''),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_USER: z.string().optional().default(''),
+  SMTP_PASS: z.string().optional().default(''),
+  MAIL_FROM: z.string().default('RideMate <no-reply@ridemate.local>'),
+  APP_URL: z.string().default('http://localhost:5173'),
   FIREBASE_PROJECT_ID: z.string().default('demo-ridemate'),
   FIREBASE_USE_EMULATOR: boolFromString,
   FIREBASE_AUTH_EMULATOR_HOST: z.string().default('127.0.0.1:9099'),
@@ -30,6 +39,14 @@ function parseDomains(raw) {
     .split(',')
     .map((d) => d.trim().toLowerCase().replace(/^@/, ''))
     .filter(Boolean);
+}
+
+/** Parses "a@x.com, B@y.org" -> ['a@x.com', 'b@y.org'] (exact addresses, not domains). */
+function parseEmails(raw) {
+  return raw
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => e.includes('@'));
 }
 
 function loadConfig(source = process.env) {
@@ -47,7 +64,13 @@ function loadConfig(source = process.env) {
     trustProxy: env.TRUST_PROXY,
     databaseUrl: env.DATABASE_URL,
     testDatabaseUrl: env.TEST_DATABASE_URL,
-    allowedEmailDomains: parseDomains(env.ALLOWED_EMAIL_DOMAINS),
+    // Demo domains count as student domains, and their accounts are verified automatically (see /api/auth/demo-verify).
+    allowedEmailDomains: [...new Set([...parseDomains(env.ALLOWED_EMAIL_DOMAINS), ...parseDomains(env.DEMO_EMAIL_DOMAINS)])],
+    demoEmailDomains: parseDomains(env.DEMO_EMAIL_DOMAINS),
+    allowDriverSignup: env.ALLOW_DRIVER_SIGNUP,
+    adminEmails: parseEmails(env.ADMIN_EMAILS),
+    smtp: { host: env.SMTP_HOST, port: env.SMTP_PORT, user: env.SMTP_USER, pass: env.SMTP_PASS, from: env.MAIL_FROM },
+    appUrl: env.APP_URL,
     firebase: {
       projectId: env.FIREBASE_PROJECT_ID,
       useEmulator: env.FIREBASE_USE_EMULATOR,
@@ -60,4 +83,4 @@ function loadConfig(source = process.env) {
 
 const config = loadConfig();
 
-module.exports = { config, loadConfig, parseDomains };
+module.exports = { config, loadConfig, parseDomains, parseEmails };

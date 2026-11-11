@@ -2,6 +2,7 @@
   "emulators": {
     "singleProjectMode": true,
     "auth": { "host": "127.0.0.1", "port": 9099 },
-    "ui": { "enabled": true, "port": 4400 }
+    "hub": { "port": 4400 },
+    "ui": { "enabled": true, "port": 4600 }
   }
 }

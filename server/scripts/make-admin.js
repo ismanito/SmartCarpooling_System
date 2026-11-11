@@ -1,11 +1,11 @@
-// Usage: npm run make-admin -- student@usiu.ac.ke
+// Usage: npm run make-admin -- someone@example.com
 // The only way to grant the admin role; no API route can do this.
 const { pool, withTransaction } = require('../src/db/pool');
 const { appendAudit } = require('../src/services/audit');
 
 async function main() {
   const email = (process.argv[2] || '').trim().toLowerCase();
-  if (!email) throw new Error('Usage: npm run make-admin -- <university email>');
+  if (!email) throw new Error('Usage: npm run make-admin -- <email>');
 
   const user = await withTransaction(async (client) => {
     const { rows } = await client.query(

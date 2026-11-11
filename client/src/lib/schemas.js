@@ -48,6 +48,16 @@ export const profileSchema = z.object({
   faculty: z.string().min(1, 'Choose your school'),
 })
 
+/** Admins are staff, not students, so there is no school to choose. */
+export const staffProfileSchema = profileSchema.omit({ faculty: true })
+
+/** Drivers are not students: they give the details an admin needs to vet them. */
+export const driverProfileSchema = profileSchema.omit({ faculty: true }).extend({
+  licenceNumber: z.string().trim().min(4, 'Enter your driving licence number').max(30),
+  idNumber: z.string().trim().min(5, 'Enter your national ID or passport number').max(20),
+  about: z.string().trim().max(1000, 'Keep this under 1000 characters').optional(),
+})
+
 export const vehicleSchema = z.object({
   makeModel: z.string().trim().min(2, 'Enter the make and model').max(80),
   plateNumber: z
@@ -58,3 +68,35 @@ export const vehicleSchema = z.object({
   colour: z.string().trim().min(2, 'Enter the colour').max(30),
   seatCapacity: z.coerce.number({ message: 'Choose the seat capacity' }).int().min(1, 'Choose the seat capacity').max(7),
 })
+
+// ---------------------------------------------------------------- rides
+
+const futureLocalTime = z
+  .string()
+  .min(1, 'Choose a departure time')
+  .refine((v) => !Number.isNaN(new Date(v).getTime()), 'Choose a departure time')
+  .refine((v) => new Date(v).getTime() > Date.now(), 'Departure time must be in the future')
+  .refine((v) => new Date(v).getTime() < Date.now() + 30 * 86_400_000, 'Departure must be within 30 days')
+
+const tripShape = {
+  origin: z.string().min(1, 'Choose a pick-up point'),
+  destination: z.string().min(1, 'Choose a destination'),
+  originBuilding: z.string().optional(),
+  destinationBuilding: z.string().optional(),
+  departAt: futureLocalTime,
+  seats: z.coerce.number().int().min(1, 'At least 1 seat').max(7, 'At most 7 seats'),
+}
+
+const samePlaceCheck = (v) => v.origin !== v.destination
+const samePlaceIssue = { path: ['destination'], message: 'Pick-up and drop-off must be different places' }
+
+export const rideRequestSchema = z.object(tripShape).refine(samePlaceCheck, samePlaceIssue)
+
+export const rideOfferSchema = z
+  .object({ ...tripShape, vehicleId: z.string().min(1, 'Choose one of your vehicles') })
+  .refine(samePlaceCheck, samePlaceIssue)
+
+/** "2026-11-04T08:00" from a datetime-local input (local time) → ISO string. */
+export function localToIso(value) {
+  return new Date(value).toISOString()
+}

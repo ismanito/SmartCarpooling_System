@@ -1,7 +1,7 @@
 import { forwardRef, useId } from 'react'
 
 const CONTROL =
-  'block w-full rounded-(--radius-control) border bg-surface px-3 text-base text-ink placeholder:text-ink/55 transition-colors focus:outline-2 focus:outline-offset-0 focus:outline-mint disabled:bg-paper-deep disabled:text-ink/85 read-only:bg-paper-deep h-12 md:h-11'
+  'block w-full rounded-(--radius-control) border bg-surface px-3 text-base text-ink placeholder:text-ink/55 transition-colors focus:outline-2 focus:outline-offset-0 focus:outline-mint disabled:bg-paper-deep disabled:text-ink/85 h-12 md:h-11'
 
 function controlBorder(error) {
   return error ? 'border-error' : 'border-ink/30 hover:border-ink/60'
@@ -32,9 +32,27 @@ export function FieldShell({ id, label, hint, error, children, optional }) {
   )
 }
 
+/**
+ * Render-prop wrapper: renders label/hint/error and passes `{ aria }` to the child,
+ * which spreads it onto its control. `aria` includes the id so the label stays linked.
+ */
+export function Field({ id, label, hint, error, optional, children }) {
+  const autoId = useId()
+  const fieldId = id || autoId
+  return (
+    <FieldShell id={fieldId} label={label} hint={hint} error={error} optional={optional}>
+      {(aria) => children({ aria: { ...aria, id: fieldId } })}
+    </FieldShell>
+  )
+}
+
 export const TextField = forwardRef(function TextField({ label, hint, error, optional, className = '', id, ...rest }, ref) {
   const autoId = useId()
   const fieldId = id || autoId
+  // Without a label, render only the control (used inside <Field>).
+  if (!label) {
+    return <input ref={ref} id={fieldId} className={`${CONTROL} read-only:bg-paper-deep ${controlBorder(rest['aria-invalid'])} ${className}`} {...rest} />
+  }
   return (
     <FieldShell id={fieldId} label={label} hint={hint} error={error} optional={optional}>
       {(aria) => <input ref={ref} id={fieldId} className={`${CONTROL} ${controlBorder(error)} ${className}`} {...aria} {...rest} />}
@@ -48,18 +66,25 @@ export const SelectField = forwardRef(function SelectField(
 ) {
   const autoId = useId()
   const fieldId = id || autoId
+  const renderSelect = (aria, invalid) => (
+    <select ref={ref} id={fieldId} className={`${CONTROL} ${controlBorder(invalid)} pr-9 ${className}`} {...aria} {...rest}>
+      <option value="">{placeholder}</option>
+      {options.map((o) => {
+        // Options may be plain strings or { value, label } pairs.
+        const { value, label: text } = typeof o === 'string' ? { value: o, label: o } : o
+        return (
+          <option key={value} value={value}>
+            {text}
+          </option>
+        )
+      })}
+    </select>
+  )
+  // Without a label, render only the control (used inside <Field>).
+  if (!label) return renderSelect({}, rest['aria-invalid'])
   return (
     <FieldShell id={fieldId} label={label} hint={hint} error={error}>
-      {(aria) => (
-        <select ref={ref} id={fieldId} className={`${CONTROL} ${controlBorder(error)} pr-9 ${className}`} {...aria} {...rest}>
-          <option value="">{placeholder}</option>
-          {options.map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
-        </select>
-      )}
+      {(aria) => renderSelect(aria, error)}
     </FieldShell>
   )
 })

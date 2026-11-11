@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  server:
+    name: Backend + end-to-end journey
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: ridemate
+          POSTGRES_PASSWORD: ridemate
+          POSTGRES_DB: ridemate_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ridemate" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://ridemate:ridemate@localhost:5432/ridemate_test
+      TEST_DATABASE_URL: postgres://ridemate:ridemate@localhost:5432/ridemate_test
+      ALLOWED_EMAIL_DOMAINS: usiu.ac.ke
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+        working-directory: server
+      # Includes tests/e2e.test.js: sign-up, trips, match, request, accept, complete, fare, ratings, incident, admin, suspension.
+      - run: npm test
+        working-directory: server
+
+  matcher:
+    name: Matcher (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: matcher/requirements.txt
+      - run: pip install -r requirements.txt
+        working-directory: matcher
+      - run: python -m pytest -q
+        working-directory: matcher
+
+  client:
+    name: Frontend (lint, test, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - run: npm ci
+        working-directory: client
+      - run: npx oxlint
+        working-directory: client
+      - run: npm test
+        working-directory: client
+      - run: npm run build
+        working-directory: client
+        env:
+          VITE_FIREBASE_API_KEY: placeholder
+          VITE_FIREBASE_AUTH_DOMAIN: placeholder.firebaseapp.com
+          VITE_FIREBASE_PROJECT_ID: placeholder
+
+  deploy-staging:
+    name: Deploy main to staging
+    needs: [server, matcher, client]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Client on Vercel. Skipped until the three Vercel secrets are added.
+      - name: Deploy client to Vercel
+        if: ${{ env.VERCEL_TOKEN != '' }}
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          npm i -g vercel@latest
+          vercel pull --yes --environment=preview --token "$VERCEL_TOKEN"
+          vercel build --token "$VERCEL_TOKEN"
+          vercel deploy --prebuilt --token "$VERCEL_TOKEN"
+      # API and matcher on Render, triggered through deploy hooks (see render.yaml).
+      - name: Deploy API to Render
+        env:
+          HOOK: ${{ secrets.RENDER_API_DEPLOY_HOOK }}
+        run: '[ -z "$HOOK" ] && echo "RENDER_API_DEPLOY_HOOK not set, skipping" || curl -fsS -X POST "$HOOK"'
+      - name: Deploy matcher to Render
+        env:
+          HOOK: ${{ secrets.RENDER_MATCHER_DEPLOY_HOOK }}
+        run: '[ -z "$HOOK" ] && echo "RENDER_MATCHER_DEPLOY_HOOK not set, skipping" || curl -fsS -X POST "$HOOK"'

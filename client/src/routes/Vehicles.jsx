@@ -1,269 +1,162 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '../components/ui/Button.jsx'
-import { Field } from '../components/ui/Field.jsx'
+import { Field, TextField } from '../components/ui/Field.jsx'
 import { SeatPicker } from '../components/ui/SeatPicker.jsx'
-import { Panel, Alert, PageTitle, ConfirmDialog } from '../components/ui/Panel.jsx'
+import { Panel, Alert, PageTitle } from '../components/ui/Panel.jsx'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog.jsx'
 import { PlateTag } from '../components/ui/PlateTag.jsx'
-import { vehicleSchema } from '../lib/schemas.js'
-import { applyFieldErrors } from '../lib/api.js'
+import { Spinner } from '../components/ui/Spinner.jsx'
+import { vehicleSchema, formatPlate } from '../lib/schemas.js'
+import { api, applyFieldErrors } from '../lib/api.js'
+import { SectionTitle, plural } from '../components/rides/RideBits.jsx'
+
+const EMPTY = { makeModel: '', plateNumber: '', colour: '', seatCapacity: 4 }
 
 export default function Vehicles() {
-  const [vehicles, setVehicles] = useState([])
+  const [vehicles, setVehicles] = useState(null)
   const [serverError, setServerError] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [openDialog, setOpenDialog] = useState(false)
-  const [deleteId, setDeleteId] = useState(null)
-  const [deleteLoading, setDeleteLoading] = useState(false)
   const [editingId, setEditingId] = useState(null)
+  const [deleting, setDeleting] = useState(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [deleteError, setDeleteError] = useState(null)
 
   const {
-    register,
-    handleSubmit,
-    setError,
-    reset,
-    formState: { errors },
-  } = useForm({
-    resolver: zodResolver(vehicleSchema),
-    defaultValues: { makeModel: '', plateNumber: '', colour: '', seatCapacity: 4 },
-  })
+    register, handleSubmit, setError, reset, watch, setValue,
+    formState: { errors, isSubmitting },
+  } = useForm({ resolver: zodResolver(vehicleSchema), defaultValues: EMPTY })
 
-  const loadVehicles = async () => {
+  const load = useCallback(async () => {
     try {
       const { vehicles: vs } = await api.listVehicles()
       setVehicles(vs)
     } catch (err) {
-      setServerError(err?.message || 'Could not load vehicles.')
-    } finally {
-      setIsLoading(false)
+      setVehicles([])
+      setServerError(err.message || 'Could not load your vehicles. Reload to try again.')
     }
-  }
-
-  useEffect(() => {
-    loadVehicles()
   }, [])
 
-  const onCreate = async (data) => {
+  useEffect(() => {
+    load()
+  }, [load])
+
+  const startEdit = (v) => {
     setServerError(null)
-    setIsLoading(true)
+    setEditingId(v.vehicleId)
+    reset({ makeModel: v.makeModel, plateNumber: formatPlate(v.plateNumber), colour: v.colour, seatCapacity: v.seatCapacity })
+  }
+
+  const stopEdit = () => {
+    setEditingId(null)
+    reset(EMPTY)
+  }
+
+  const onSubmit = async (data) => {
+    setServerError(null)
     try {
-      await api.createVehicle(data)
-      reset()
-      await loadVehicles()
+      if (editingId) await api.updateVehicle(editingId, data)
+      else await api.createVehicle(data)
+      stopEdit()
+      await load()
     } catch (err) {
-      if (!(err instanceof Error && err.name === 'ApiError')) {
-        setServerError(err?.message || 'Something went wrong. Please try again.')
-      } else if (!applyFieldErrors(err, setError)) {
-        setServerError(err.message || 'Something went wrong. Please try again.')
-      }
-    } finally {
-      setIsLoading(false)
+      if (err.code === 'PLATE_TAKEN') setError('plateNumber', { message: err.message })
+      else if (!applyFieldErrors(err, setError)) setServerError(err.message || 'Your vehicle was not saved. Try again.')
     }
   }
 
-  const onUpdate = async (id, data) => {
-    setServerError(null)
-    setIsLoading(true)
+  const confirmDelete = async () => {
+    setDeleteBusy(true)
+    setDeleteError(null)
     try {
-      await api.updateVehicle(id, data)
-      setEditingId(null)
-      reset({ makeModel: '', plateNumber: '', colour: '', seatCapacity: 4 })
-      await loadVehicles()
+      await api.deleteVehicle(deleting.vehicleId)
+      if (editingId === deleting.vehicleId) stopEdit()
+      setDeleting(null)
+      await load()
     } catch (err) {
-      if (!(err instanceof Error && err.name === 'ApiError')) {
-        setServerError(err?.message || 'Something went wrong. Please try again.')
-      } else if (!applyFieldErrors(err, setError)) {
-        setServerError(err.message || 'Something went wrong. Please try again.')
-      }
+      setDeleteError(err.message || 'The vehicle was not deleted. Try again.')
     } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const onDelete = async (id) => {
-    setDeleteLoading(true)
-    try {
-      await api.deleteVehicle(id)
-      await loadVehicles()
-    } catch (err) {
-      setServerError(err?.message || 'Could not delete vehicle.')
-    } finally {
-      setDeleteLoading(false)
-      setOpenDialog(false)
-      setDeleteId(null)
+      setDeleteBusy(false)
     }
   }
 
   return (
-    <Panel className="w-full max-w-3xl mx-auto mt-10">
-      <PageTitle className="mb-6">My vehicles</PageTitle>
-      {serverError && <Alert tone="error">{serverError}</Alert>}
-      <form onSubmit={handleSubmit(onCreate)} className="space-y-4 mb-6">
-        <Field
-          label="Make and model"
-          error={errors.makeModel?.message}
-        >
-          {({ aria }) => (
-            <input
-              id="makeModel"
-              {...aria}
-              {...register('makeModel')}
-              className="block w-full rounded-(--radius-control) border bg-surface px-3 text-base text-ink placeholder:text-ink/55 transition-colors focus:outline-2 focus:outline-offset-0 focus:outline-mint h-12 md:h-11"
-              placeholder="Toyota Corolla"
-              defaultValue=""
-            />
-          )}
-        </Field>
-        <Field
-          label="Number plate"
-          hint="e.g. KDA 123A"
-          error={errors.plateNumber?.message}
-        >
-          {({ aria }) => (
-            <input
-              id="plateNumber"
-              {...aria}
-              {...register('plateNumber')}
-              className="block w-full rounded-(--radius-control) border bg-surface px-3 text-base text-ink placeholder:text-ink/55 transition-colors focus:outline-2 focus:outline-offset-0 focus:outline-mint h-12 md:h-11"
-              placeholder="KDA 123A"
-              defaultValue=""
-            />
-          )}
-        </Field>
-        <Field label="Colour" error={errors.colour?.message}>
-          {({ aria }) => (
-            <input
-              id="colour"
-              {...aria}
-              {...register('colour')}
-              className="block w-full rounded-(--radius-control) border bg-surface px-3 text-base text-ink placeholder:text-ink/55 transition-colors focus:outline-2 focus:outline-offset-0 focus:outline-mint h-12 md:h-11"
-              placeholder="Silver"
-              defaultValue=""
-            />
-          )}
-        </Field>
-        <SeatPicker
-          label="Seat capacity"
-          value={Number(register('seatCapacity').value) || 4}
-          onChange={(v) => register('seatCapacity').onChange({ target: { value: String(v) } })}
-          error={errors.seatCapacity?.message}
-        />
-        <Button variant="primary" type="submit" fullWidth isLoading={isLoading} disabled={isLoading}>
-          Add vehicle
-        </Button>
-      </form>
+    <div className="grid items-start gap-6 lg:grid-cols-2">
+      <Panel>
+        <PageTitle className="mb-6">{editingId ? 'Edit vehicle' : 'Add a vehicle'}</PageTitle>
+        {serverError && <Alert tone="error">{serverError}</Alert>}
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+          <Field label="Make and model" error={errors.makeModel?.message}>
+            {({ aria }) => <TextField {...aria} {...register('makeModel')} placeholder="Toyota Corolla" />}
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Number plate" error={errors.plateNumber?.message}>
+              {({ aria }) => <TextField {...aria} {...register('plateNumber')} placeholder="KDA 123A" className="uppercase" />}
+            </Field>
+            <Field label="Colour" error={errors.colour?.message}>
+              {({ aria }) => <TextField {...aria} {...register('colour')} placeholder="Silver" />}
+            </Field>
+          </div>
+          <SeatPicker
+            label="Passenger seats"
+            value={Number(watch('seatCapacity')) || 4}
+            onChange={(v) => setValue('seatCapacity', v, { shouldValidate: true })}
+            error={errors.seatCapacity?.message}
+          />
+          <div className="flex gap-2">
+            <Button type="submit" fullWidth isLoading={isSubmitting}>
+              {editingId ? 'Save changes' : 'Add vehicle'}
+            </Button>
+            {editingId && (
+              <Button variant="secondary" onClick={stopEdit}>
+                Cancel
+              </Button>
+            )}
+          </div>
+        </form>
+      </Panel>
 
-      <div className="space-y-3">
-        {vehicles.length === 0 ? (
-          <p className="text-sm text-ink/85 text-center">No vehicles registered yet.</p>
+      <section aria-labelledby="my-vehicles" className="space-y-3">
+        <SectionTitle id="my-vehicles">My vehicles</SectionTitle>
+        {vehicles === null ? (
+          <Spinner />
+        ) : vehicles.length === 0 ? (
+          <p className="text-sm text-ink/85">No vehicles yet. Add one to start offering rides.</p>
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-3">
             {vehicles.map((v) => (
-              <li
-                key={v.vehicleId}
-                className="flex items-center justify-between gap-3 border border-ink/20 rounded-(--radius-panel) bg-surface p-4 shadow-(--shadow-contact)"
-              >
-                <div className="flex items-center gap-4">
-                  <PlateTag plate={v.plateNumber} className="font-medium" />
-                  <div className="flex flex-col gap-1">
-                    <span className="text-sm text-ink">{v.makeModel}</span>
-                    <span className="text-xs text-ink/60">
-                      {v.colour} • {v.seatCapacity} seat{v.seatCapacity === 1 ? '' : 's'}
-                    </span>
-                  </div>
+              <li key={v.vehicleId} className="flex flex-wrap items-center justify-between gap-3 rounded-(--radius-panel) border border-ink/20 bg-surface p-4 shadow-(--shadow-contact)">
+                <div className="flex flex-col items-start gap-2">
+                  <PlateTag plate={v.plateNumber} className="text-base" />
+                  <p className="text-sm text-ink">
+                    {v.colour} {v.makeModel} · {plural(v.seatCapacity, 'passenger seat')}
+                  </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  {editingId === v.vehicleId ? (
-                    <VehicleEditForm
-                      vehicle={v}
-                      onSave={(data) => onUpdate(v.vehicleId, data)}
-                      onCancel={() => setEditingId(null)}
-                      isSaving={isLoading && editingId === v.vehicleId}
-                    />
-                  ) : (
-                    <>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setEditingId(v.vehicleId)}
-                        disabled={isLoading}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        onClick={() => { setDeleteId(v.vehicleId); setOpenDialog(true) }}
-                        disabled={isLoading}
-                      >
-                        Delete
-                      </Button>
-                    </>
-                  )}
+                <div className="flex gap-2">
+                  <Button variant="secondary" size="sm" onClick={() => startEdit(v)}>
+                    Edit
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => { setDeleteError(null); setDeleting(v) }}>
+                    Delete
+                  </Button>
                 </div>
               </li>
             ))}
           </ul>
         )}
-      </div>
+      </section>
 
       <ConfirmDialog
-        open={openDialog}
-        title="Delete vehicle?"
-        children="This cannot be undone. Are you sure?"
-        confirmLabel="Delete"
-        onConfirm={() => onDelete(deleteId)}
-        onCancel={() => setOpenDialog(false)}
-        isLoading={deleteLoading}
-      />
-    </Panel>
-  )
-}
-
-function VehicleEditForm({ vehicle, onSave, onCancel, isSaving }) {
-  const [local, setLocal] = useState({
-    makeModel: vehicle.makeModel,
-    plateNumber: vehicle.plateNumber,
-    colour: vehicle.colour,
-    seatCapacity: String(vehicle.seatCapacity),
-  })
-
-  return (
-    <div className="flex items-center gap-2">
-      <input
-        className="border border-ink/30 rounded-(--radius-control) px-2 py-1.5 text-sm text-ink w-32"
-        value={local.makeModel}
-        onChange={(e) => setLocal({ ...local, makeModel: e.target.value })}
-      />
-      <input
-        className="border border-ink/30 rounded-(--radius-control) px-2 py-1.5 text-sm text-ink w-24 uppercase"
-        value={local.plateNumber}
-        onChange={(e) => setLocal({ ...local, plateNumber: e.target.value })}
-      />
-      <input
-        className="border border-ink/30 rounded-(--radius-control) px-2 py-1.5 text-sm text-ink w-20"
-        value={local.colour}
-        onChange={(e) => setLocal({ ...local, colour: e.target.value })}
-      />
-      <SeatPicker
-        label=""
-        value={Number(local.seatCapacity) || 1}
-        onChange={(v) => setLocal({ ...local, seatCapacity: String(v) })}
-        error={false}
-      />
-      <Button
-        variant="primary"
-        size="sm"
-        onClick={() => onSave(local)}
-        isLoading={isSaving}
-        disabled={isSaving}
+        open={Boolean(deleting)}
+        title="Delete this vehicle?"
+        confirmLabel="Delete vehicle"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleting(null)}
+        isLoading={deleteBusy}
+        error={deleteError}
       >
-        Save
-      </Button>
-      <Button variant="ghost" size="sm" onClick={onCancel}>
-        Cancel
-      </Button>
+        {deleting && `${deleting.makeModel} (${formatPlate(deleting.plateNumber)}) will be removed from your account.`}
+      </ConfirmDialog>
     </div>
   )
 }

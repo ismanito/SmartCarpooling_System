@@ -2,36 +2,74 @@ const { Router } = require('express');
 const { withTransaction } = require('../db/pool');
 const { errors, PG } = require('../lib/errors');
 const { changedFields } = require('../lib/changes');
-const { isAllowedEmail } = require('../lib/emailDomain');
 const { requireAuth } = require('../middleware/auth');
 const { validateBody } = require('../middleware/validate');
-const { createProfileSchema, updateProfileSchema } = require('../schemas/user');
+const { createProfileSchema, createStaffProfileSchema, updateProfileSchema } = require('../schemas/user');
 const { appendAudit } = require('../services/audit');
 const usersRepo = require('../repositories/users');
 
 const router = Router();
 
+const { emailKind } = require('../lib/emailDomain');
+const { createDriverProfileSchema } = require('../schemas/user');
+const { notifyMany, adminIds } = require('../services/notify');
+const drivers = require('../repositories/drivers');
+
+// The email address decides who you are: a university address is a student, a listed address is an admin,
+// and (when driver sign-up is on) any other address applies to drive. Each gets the form that fits.
+const SCHEMAS = { admin: createStaffProfileSchema, student: createProfileSchema, driver: createDriverProfileSchema };
+const profileBody = (req, res, next) => {
+  const kind = emailKind(req.auth.email, req.app.locals.config);
+  if (!kind) return next(); // the handler below rejects it with the right error
+  return validateBody(SCHEMAS[kind])(req, res, next);
+};
+
 /** Creates the RideMate profile for a freshly signed-up, verified Firebase user. */
-router.post('/', requireAuth({ profile: false }), validateBody(createProfileSchema), async (req, res) => {
+router.post('/', requireAuth({ profile: false }), profileBody, async (req, res) => {
   if (req.user) throw errors.conflict('PROFILE_EXISTS', 'Your profile already exists.');
 
   // Defence in depth: requireAuth already checks this, but registration is the one place it must never slip.
-  if (!isAllowedEmail(req.auth.email, req.app.locals.config.allowedEmailDomains)) {
+  const kind = emailKind(req.auth.email, req.app.locals.config);
+  if (!kind) {
     throw errors.forbidden('AUTH_DOMAIN_NOT_ALLOWED', 'RideMate is only open to verified university email addresses.');
   }
 
   try {
     const user = await withTransaction(async (client) => {
-      const row = await usersRepo.create(client, { firebaseUid: req.auth.uid, email: req.auth.email, ...req.body });
+      const { licenceNumber, idNumber, about, ...profile } = req.body;
+      const row = await usersRepo.create(client, {
+        firebaseUid: req.auth.uid,
+        email: req.auth.email,
+        ...profile,
+        faculty: kind === 'admin' ? 'Administration' : kind === 'driver' ? 'Driver' : profile.faculty,
+        role: kind,
+      });
       await appendAudit(client, {
         userId: row.user_id,
         action: 'user.create',
         entity: 'user',
         entityId: row.user_id,
         ipAddress: req.ip,
-        details: { firebase_uid: req.auth.uid },
+        details: { firebase_uid: req.auth.uid, role: row.role },
       });
-      return row;
+      if (kind === 'driver') {
+        const app = await drivers.createApplication(client, row.user_id, { licenceNumber, idNumber, about });
+        await appendAudit(client, {
+          userId: row.user_id,
+          action: 'driver.apply',
+          entity: 'driver_application',
+          entityId: app.application_id,
+          ipAddress: req.ip,
+          details: { application_id: app.application_id, user_id: row.user_id },
+        });
+        await notifyMany(client, await adminIds(client), {
+          type: 'driver.application',
+          message: `${row.full_name} applied to drive. Review the application.`,
+          link: '/admin?tab=drivers',
+          email: true,
+        });
+      }
+      return usersRepo.findById(row.user_id, client);
     });
     res.status(201).json({ user: usersRepo.toApi(user) });
   } catch (err) {

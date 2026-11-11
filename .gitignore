@@ -27,3 +27,6 @@ firebase-debug.log
 .idea/
 .DS_Store
 Thumbs.db
+
+# Local Firebase emulator accounts
+.emulator-data/

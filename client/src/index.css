@@ -7,6 +7,7 @@
   --color-surface: #ffffff;
   --color-ink: #156064;
   --color-ink-deep: #0f4a4d;
+  --color-asphalt: #0b3336;
   --color-gold: #f8e16c;
   --color-coral: #fb8f67;
   --color-mint: #01c49a;
@@ -44,6 +45,29 @@
   background-image: radial-gradient(rgb(21 96 100 / 0.16) 1px, transparent 1px);
   background-size: 8px 8px;
   background-position: 4px 4px;
+}
+
+/* Road markings: the one signature of the site. Gold lane dashes on asphalt. */
+@utility lane-vertical {
+  background-image: repeating-linear-gradient(to bottom, var(--color-gold) 0 12px, transparent 12px 24px);
+  background-size: 100% 24px;
+}
+
+@utility lane-horizontal {
+  background-image: repeating-linear-gradient(to right, var(--color-gold) 0 22px, transparent 22px 40px);
+}
+
+@keyframes road-run {
+  to {
+    background-position-y: 24px;
+  }
+}
+
+@utility road-run {
+  animation: road-run 0.9s linear infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
 }
 
 /* 10px diagonal cut on the top-right corner of the status pane. */

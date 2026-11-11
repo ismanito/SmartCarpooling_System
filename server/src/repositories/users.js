@@ -1,7 +1,8 @@
 const { pool } = require('../db/pool');
 
 const COLUMNS = `user_id, firebase_uid, full_name, university_email, phone_number, faculty,
-                 role, is_verified, status, avg_rating, created_at, updated_at`;
+                 role, is_verified, status, avg_rating, created_at, updated_at,
+                 (SELECT d.status FROM driver_applications d WHERE d.user_id = users.user_id) AS driver_status`;
 
 async function findByFirebaseUid(firebaseUid, db = pool) {
   const { rows } = await db.query(`SELECT ${COLUMNS} FROM users WHERE firebase_uid = $1`, [firebaseUid]);
@@ -16,6 +17,14 @@ async function findById(userId, db = pool, { forUpdate = false } = {}) {
   return rows[0] || null;
 }
 
+async function relinkByEmail(firebaseUid, email, db = pool) {
+  const { rows } = await db.query(
+    `UPDATE users SET firebase_uid = $1 WHERE university_email = $2 RETURNING ${COLUMNS}`,
+    [firebaseUid, email],
+  );
+  return rows[0] || null;
+}
+
 async function markVerified(userId, db = pool) {
   const { rows } = await db.query(
     `UPDATE users SET is_verified = true WHERE user_id = $1 RETURNING ${COLUMNS}`,
@@ -24,12 +33,12 @@ async function markVerified(userId, db = pool) {
   return rows[0];
 }
 
-async function create(db, { firebaseUid, email, fullName, phoneNumber, faculty }) {
+async function create(db, { firebaseUid, email, fullName, phoneNumber, faculty, role = 'student' }) {
   const { rows } = await db.query(
-    `INSERT INTO users (firebase_uid, university_email, full_name, phone_number, faculty, is_verified)
-     VALUES ($1, $2, $3, $4, $5, true)
+    `INSERT INTO users (firebase_uid, university_email, full_name, phone_number, faculty, role, is_verified)
+     VALUES ($1, $2, $3, $4, $5, $6, true)
      RETURNING ${COLUMNS}`,
-    [firebaseUid, email, fullName, phoneNumber, faculty],
+    [firebaseUid, email, fullName, phoneNumber, faculty, role],
   );
   return rows[0];
 }
@@ -66,9 +75,11 @@ function toApi(row) {
     role: row.role,
     isVerified: row.is_verified,
     status: row.status,
+    driverStatus: row.driver_status || null,
     avgRating: row.avg_rating,
     createdAt: row.created_at,
   };
 }
 
-module.exports = { findByFirebaseUid, findById, markVerified, create, updateProfile, toApi, UPDATABLE };
+module.exports = {
+  relinkByEmail, findByFirebaseUid, findById, markVerified, create, updateProfile, toApi, UPDATABLE };

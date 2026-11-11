@@ -14,7 +14,7 @@ async function resetDb() {
     await client.query('ALTER TABLE audit_log DISABLE TRIGGER audit_log_no_truncate');
     await client.query('TRUNCATE audit_log RESTART IDENTITY');
     await client.query('ALTER TABLE audit_log ENABLE TRIGGER audit_log_no_truncate');
-    await client.query('DELETE FROM users'); // cascades to vehicles; settings keep their rows
+    await client.query('DELETE FROM users'); // cascades to vehicles, rides and bookings; settings keep their rows
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK');

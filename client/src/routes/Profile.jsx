@@ -4,23 +4,25 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '../components/ui/Button.jsx'
 import { Field, TextField, SelectField } from '../components/ui/Field.jsx'
 import { Panel, Alert, PageTitle } from '../components/ui/Panel.jsx'
-import { updateProfileSchema } from '../lib/schemas.js'
+import { profileSchema, staffProfileSchema } from '../lib/schemas.js'
 import { applyFieldErrors } from '../lib/api.js'
 import { FACULTIES } from '../constants/faculties.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { Rating } from '../components/rides/RideBits.jsx'
 
 export default function Profile() {
   const { profile, updateProfile } = useAuth()
   const [serverError, setServerError] = useState(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const isStudent = profile?.role === 'student'
 
   const {
     register,
     handleSubmit,
     setError,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm({
-    resolver: zodResolver(updateProfileSchema),
+    resolver: zodResolver(isStudent ? profileSchema : staffProfileSchema),
     defaultValues: {
       fullName: profile?.fullName ?? '',
       phoneNumber: profile?.phoneNumber ?? '',
@@ -30,71 +32,36 @@ export default function Profile() {
 
   const onSubmit = async (data) => {
     setServerError(null)
-    setIsLoading(true)
+    setSaved(false)
     try {
-      await updateProfile(data)
+      await updateProfile(isStudent ? data : { fullName: data.fullName, phoneNumber: data.phoneNumber })
+      setSaved(true)
     } catch (err) {
-      if (!(err instanceof Error && err.name === 'ApiError')) {
-        setServerError(err?.message || 'Something went wrong. Please try again.')
-      } else if (!applyFieldErrors(err, setError)) {
-        setServerError(err.message || 'Something went wrong. Please try again.')
-      }
-    } finally {
-      setIsLoading(false)
+      if (!applyFieldErrors(err, setError)) setServerError(err?.message || 'Your changes were not saved. Try again.')
     }
   }
 
   return (
-    <Panel className="w-full max-w-md mx-auto mt-10">
-      <PageTitle className="mb-6">Edit profile</PageTitle>
+    <Panel className="mx-auto w-full max-w-xl">
+      <PageTitle className="mb-1">Your profile</PageTitle>
+      <p className="mb-6 flex flex-wrap items-center gap-2 text-sm text-ink/85">
+        {profile?.universityEmail} <Rating value={profile?.avgRating} />
+      </p>
       {serverError && <Alert tone="error">{serverError}</Alert>}
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <Field
-          label="Full name"
-          error={errors.fullName?.message}
-        >
-          {({ aria }) => (
-            <TextField
-              id="fullName"
-              {...aria}
-              {...register('fullName')}
-              autoComplete="name"
-              defaultValue={profile?.fullName || ''}
-            />
-          )}
+      {saved && <Alert tone="info">Changes saved.</Alert>}
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        <Field label="Full name" error={errors.fullName?.message}>
+          {({ aria }) => <TextField {...aria} {...register('fullName')} autoComplete="name" />}
         </Field>
-        <Field
-          label="Phone number"
-          hint="Kenyan number, e.g. 0712 345 678"
-          error={errors.phoneNumber?.message}
-        >
-          {({ aria }) => (
-            <TextField
-              id="phoneNumber"
-              {...aria}
-              {...register('phoneNumber')}
-              type="tel"
-              autoComplete="tel"
-              defaultValue={profile?.phoneNumber || ''}
-            />
-          )}
+        <Field label="Phone number" hint="Only shared with people you have a confirmed ride with" error={errors.phoneNumber?.message}>
+          {({ aria }) => <TextField {...aria} {...register('phoneNumber')} type="tel" autoComplete="tel" />}
         </Field>
-        <Field
-          label="Faculty"
-          error={errors.faculty?.message}
-        >
-          {({ aria }) => (
-            <SelectField
-              id="faculty"
-              {...aria}
-              {...register('faculty')}
-              options={FACULTIES}
-              placeholder="Choose…"
-              defaultValue={profile?.faculty || ''}
-            />
-          )}
-        </Field>
-        <Button variant="primary" type="submit" fullWidth isLoading={isLoading} disabled={isLoading}>
+        {isStudent && (
+          <Field label="Faculty" error={errors.faculty?.message}>
+            {({ aria }) => <SelectField {...aria} {...register('faculty')} options={FACULTIES} />}
+          </Field>
+        )}
+        <Button type="submit" fullWidth isLoading={isSubmitting}>
           Save changes
         </Button>
       </form>

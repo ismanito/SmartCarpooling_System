@@ -12,6 +12,10 @@ function getFirebaseAuth() {
   if (config.firebase.useEmulator) {
     // The Admin SDK reads this variable and accepts the emulator's unsigned tokens.
     process.env.FIREBASE_AUTH_EMULATOR_HOST = config.firebase.authEmulatorHost;
+  } else {
+    // The .env file lists the emulator address too. If it leaked into the environment the Admin SDK would
+    // switch to emulator mode and reject every real token as having an invalid signature.
+    delete process.env.FIREBASE_AUTH_EMULATOR_HOST;
   }
 
   const app =
@@ -35,4 +39,9 @@ async function verifyIdToken(idToken) {
   return { uid: decoded.uid, email: decoded.email, emailVerified: decoded.email_verified === true };
 }
 
-module.exports = { verifyIdToken };
+/** Marks a Firebase account's email as verified (demo accounts only; the caller checks the domain). */
+async function markEmailVerified(uid) {
+  await getFirebaseAuth().updateUser(uid, { emailVerified: true });
+}
+
+module.exports = { verifyIdToken, markEmailVerified };

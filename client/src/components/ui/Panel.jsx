@@ -1,7 +1,7 @@
 /** White record panel: one hairline rim + a restrained contact shadow. */
 export function Panel({ as: Tag = 'section', className = '', children, ...rest }) {
   return (
-    <Tag className={`rounded-(--radius-panel) border border-ink/20 bg-surface shadow-(--shadow-contact) ${className}`} {...rest}>
+    <Tag className={`rounded-(--radius-panel) border border-ink/20 bg-surface p-5 shadow-(--shadow-contact) md:p-6 ${className}`} {...rest}>
       {children}
     </Tag>
   )
@@ -30,7 +30,7 @@ export function Alert({ tone = 'error', children }) {
     info: 'border-ink/25 bg-surface text-ink',
   }
   return (
-    <div role={tone === 'error' ? 'alert' : 'status'} className={`rounded-(--radius-control) border px-3 py-2.5 text-sm ${tones[tone]}`}>
+    <div role={tone === 'error' ? 'alert' : 'status'} className={`mb-4 rounded-(--radius-control) border px-3 py-2.5 text-sm ${tones[tone]}`}>
       {children}
     </div>
   )

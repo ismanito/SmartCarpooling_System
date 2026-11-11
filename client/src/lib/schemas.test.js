@@ -3,12 +3,13 @@ import {
   signUpSchema,
   loginSchema,
   profileSchema,
+  staffProfileSchema,
+  driverProfileSchema,
   vehicleSchema,
   normalisePhone,
   normalisePlate,
   formatPlate,
-  KENYAN_PHONE_RE,
-} from './schemas.js'
+  KENYAN_PHONE_RE, rideRequestSchema, rideOfferSchema, localToIso } from './schemas.js'
 
 describe('normalisePhone', () => {
   it.each([
@@ -137,5 +138,54 @@ describe('vehicleSchema', () => {
       seatCapacity: 0,
     })
     expect(result.success).toBe(false)
+  })
+})
+
+describe('ride form schemas', () => {
+  const inMinutes = (m) => new Date(Date.now() + m * 60_000).toISOString()
+  const trip = { origin: 'usiu', destination: 'cbd', departAt: inMinutes(60), seats: 2 }
+
+  it('accepts a valid request and offer', () => {
+    expect(rideRequestSchema.safeParse(trip).success).toBe(true)
+    expect(rideOfferSchema.safeParse({ ...trip, vehicleId: 'abc' }).success).toBe(true)
+  })
+
+  it.each([
+    ['a past time', { departAt: inMinutes(-5) }, 'departAt'],
+    ['a time too far ahead', { departAt: inMinutes(60 * 24 * 40) }, 'departAt'],
+    ['the same start and end', { destination: 'usiu' }, 'destination'],
+    ['no pick-up', { origin: '' }, 'origin'],
+    ['too many seats', { seats: 8 }, 'seats'],
+  ])('rejects %s', (_, change, field) => {
+    const result = rideRequestSchema.safeParse({ ...trip, ...change })
+    expect(result.success).toBe(false)
+    expect(result.error.issues.map((i) => i.path[0])).toContain(field)
+  })
+
+  it('requires a vehicle on an offer', () => {
+    expect(rideOfferSchema.safeParse({ ...trip, vehicleId: '' }).success).toBe(false)
+  })
+
+  it('turns a local time into ISO', () => {
+    expect(localToIso('2030-01-02T08:00')).toBe(new Date(2030, 0, 2, 8, 0).toISOString())
+  })
+})
+
+describe('staffProfileSchema', () => {
+  const base = { fullName: 'Pat Admin', phoneNumber: '0712 345 678' }
+
+  it('does not ask admins for a school, but students still must pick one', () => {
+    expect(staffProfileSchema.safeParse(base).success).toBe(true)
+    expect(profileSchema.safeParse(base).success).toBe(false)
+    expect(profileSchema.safeParse({ ...base, faculty: 'Law' }).success).toBe(true)
+  })
+})
+
+describe('driverProfileSchema', () => {
+  const base = { fullName: 'Dan Driver', phoneNumber: '0712 345 678' }
+
+  it('needs a licence and ID number but no school', () => {
+    expect(driverProfileSchema.safeParse(base).success).toBe(false)
+    expect(driverProfileSchema.safeParse({ ...base, licenceNumber: 'DL-123456', idNumber: '12345678' }).success).toBe(true)
   })
 })
