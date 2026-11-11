@@ -133,9 +133,9 @@ export function LiveMap({ markers = [], car = null, route = null, polygons = [],
     m.invalidateSize() // the box may have only just been laid out
     const pts = [...markers.map((p) => [p.lat, p.lng]), ...(car ? [[car.lat, car.lng]] : [])]
     if (polygons.length && pts.length === 0) {
-      m.fitBounds(polygons.flatMap((p) => p.rings.flat()), { padding: [24, 24] })
-    } else if (pts.length > 1) m.fitBounds(pts, { padding: [70, 70], maxZoom: 15 })
-    else if (pts.length === 1) m.setView(pts[0], 15)
+      m.fitBounds(polygons.flatMap((p) => p.rings.flat()), { padding: [24, 24], animate: false })
+    } else if (pts.length > 1) m.fitBounds(pts, { padding: [70, 70], maxZoom: 15, animate: false })
+    else if (pts.length === 1) m.setView(pts[0], 15, { animate: false })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitKey])
 
