@@ -5,7 +5,7 @@ import 'leaflet/dist/leaflet.css'
 const USIU = [-1.2195, 36.8789]
 
 /** Map of the chosen pick-up and drop-off. Uses OpenStreetMap tiles, which need no API key. */
-function carIcon(heading) {
+export function carIcon(heading) {
   const rotate = Number.isFinite(heading) ? heading : 0
   return L.divIcon({
     className: '',

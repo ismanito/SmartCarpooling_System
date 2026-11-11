@@ -16,7 +16,11 @@ import Admin from './routes/Admin.jsx'
 import DriverDashboard from './routes/DriverDashboard.jsx'
 import StudentOnly from './routes/StudentOnly.jsx'
 import DriverArea from './routes/DriverArea.jsx'
+import ClassicLayout from './routes/ClassicLayout.jsx'
 import MyRides from './routes/MyRides.jsx'
+import RideHome from './routes/RideHome.jsx'
+import DriverApp from './routes/DriverApp.jsx'
+import Bookings from './routes/Bookings.jsx'
 import RideDetails from './routes/RideDetails.jsx'
 
 // ProtectedRoute renders <Outlet />, so it is used as a layout route around its pages.
@@ -40,18 +44,29 @@ export default function App() {
         <Route element={<AppShell />}>
           <Route path="/profile" element={<Profile />} />
           <Route path="/admin" element={<Admin />} />
+          {/* Ride Now / Book */}
           <Route element={<StudentOnly />}>
-            <Route path="/" element={<Home />} />
-            <Route path="/rides/find" element={<FindRide />} />
+            <Route path="/" element={<RideHome />} />
+            <Route path="/bookings" element={<Bookings />} />
           </Route>
           <Route element={<DriverArea />}>
-            <Route path="/driver" element={<DriverDashboard />} />
+            <Route path="/drive" element={<DriverApp />} />
             <Route path="/vehicles" element={<Vehicles />} />
           </Route>
-          <Route element={<DriverArea needApproval />}>
-            <Route path="/rides" element={<MyRides />} />
-            <Route path="/rides/offer" element={<OfferRide />} />
-            <Route path="/rides/:offerId" element={<RideDetails />} />
+          {/* Classic carpool (deprecated): drivers post trips and riders search them. Kept until you confirm removal. */}
+          <Route element={<ClassicLayout />}>
+            <Route element={<StudentOnly />}>
+              <Route path="/classic" element={<Home />} />
+              <Route path="/rides/find" element={<FindRide />} />
+            </Route>
+            <Route element={<DriverArea />}>
+              <Route path="/driver" element={<DriverDashboard />} />
+            </Route>
+            <Route element={<DriverArea needApproval />}>
+              <Route path="/rides" element={<MyRides />} />
+              <Route path="/rides/offer" element={<OfferRide />} />
+              <Route path="/rides/:offerId" element={<RideDetails />} />
+            </Route>
           </Route>
         </Route>
       </Route>

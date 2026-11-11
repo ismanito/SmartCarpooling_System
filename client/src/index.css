@@ -89,3 +89,11 @@
     outline-color: var(--color-mint);
   }
 }
+
+@keyframes slide-up {
+  from { transform: translateY(40px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-ping, .animate-pulse, [class*='animate-[slide-up'] { animation: none !important; }
+}

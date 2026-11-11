@@ -5,25 +5,23 @@ import { NotificationBell } from './NotificationBell.jsx'
 import { InstallButton } from './InstallButton.jsx'
 
 const STUDENT_LINKS = [
-  { to: '/', label: 'Rider', end: true },
-  { to: '/driver', label: 'Driver' },
-  { to: '/rides', label: 'My rides', end: true },
-  { to: '/rides/find', label: 'Find a ride' },
-  { to: '/rides/offer', label: 'Offer a ride' },
+  { to: '/', label: 'Ride', end: true },
+  { to: '/bookings', label: 'My bookings' },
+  { to: '/drive', label: 'Drive' },
   { to: '/vehicles', label: 'Vehicles' },
+  { to: '/classic', label: 'Classic carpool (old)' },
   { to: '/profile', label: 'Profile' },
 ]
 
 // Vetted drivers (not students) only drive. Until they are approved they just see their application and vehicles.
 const DRIVER_LINKS = [
-  { to: '/driver', label: 'Driver', end: true },
-  { to: '/rides', label: 'My rides', end: true },
-  { to: '/rides/offer', label: 'Offer a ride' },
+  { to: '/drive', label: 'Drive', end: true },
   { to: '/vehicles', label: 'Vehicles' },
+  { to: '/classic', label: 'Classic carpool (old)' },
   { to: '/profile', label: 'Profile' },
 ]
 const PENDING_DRIVER_LINKS = [
-  { to: '/driver', label: 'My application', end: true },
+  { to: '/drive', label: 'My application', end: true },
   { to: '/vehicles', label: 'Vehicles' },
   { to: '/profile', label: 'Profile' },
 ]

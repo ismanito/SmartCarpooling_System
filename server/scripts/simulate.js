@@ -14,6 +14,7 @@ const SEED = arg('seed', 42);
 const DRIVERS = arg('drivers', 20);
 const REQUESTS = arg('requests', 60);
 const ACCEPT = arg('accept', 0.85); // chance a driver says yes to an offer
+const SPREAD = arg('spread', 1); // share of riders who start anywhere in the pilot area; the rest start near campus
 const WAVE = arg('wave', 10); // requests that arrive before rides get finished and drivers free up
 
 // The simulation writes data, so it only ever touches the test database.
@@ -80,7 +81,8 @@ async function main() {
     const riderId = await make('rider', i);
     const roll = rand();
     // 70% head to campus, 15% leave campus, 15% travel between other areas.
-    const [from, to] = roll < 0.7 ? [pick(outer), campus] : roll < 0.85 ? [campus, pick(outer)] : [pick(outer), pick(outer)];
+    const origin = () => (rand() < SPREAD ? pick(outer) : pick(near.filter((z) => z !== campus)));
+    const [from, to] = roll < 0.7 ? [origin(), campus] : roll < 0.85 ? [campus, origin()] : [origin(), origin()];
     requests.push({ riderId, pickup: inZone(from), dropoff: inZone(to) });
   }
 
@@ -147,6 +149,7 @@ async function main() {
 
   const report = {
     seed: SEED,
+    spread: SPREAD,
     drivers: DRIVERS,
     requests: totals[0].total,
     served: totals[0].served,

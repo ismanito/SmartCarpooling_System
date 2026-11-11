@@ -112,7 +112,9 @@ async function state(user) {
        FROM rides r LEFT JOIN ride_shares s ON s.ride_id = r.ride_id WHERE r.driver_id = $1 AND r.status = 'completed'`,
     [user.userId],
   );
+  const settings = await dispatch.loadSettings();
   return {
+    noShowWaitS: settings.noShowWaitS,
     canDrive: canDrive(user),
     isOnline: Boolean(ds?.is_online),
     seatsFree: ds?.seats_free ?? 0,

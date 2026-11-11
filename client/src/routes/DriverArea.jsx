@@ -6,6 +6,6 @@ export default function DriverArea({ needApproval = false }) {
   const { profile } = useAuth()
   if (profile?.role === 'admin') return <Navigate to="/admin" replace />
   // A driver whose application is still being reviewed (or was rejected) lands on the status page.
-  if (needApproval && profile?.role === 'driver' && profile.driverStatus !== 'approved') return <Navigate to="/driver" replace />
+  if (needApproval && profile?.role === 'driver' && profile.driverStatus !== 'approved') return <Navigate to="/drive" replace />
   return <Outlet />
 }

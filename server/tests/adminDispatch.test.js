@@ -1,6 +1,11 @@
 const { api, resetDb, createStudent, createAdmin, auth, pool, auditRows } = require('./helpers/testApp');
 
-beforeEach(resetDb);
+// Zones are seeded data that resetDb keeps, so remove the ones these tests create.
+const cleanZones = () => pool.query("DELETE FROM zones WHERE name IN ('Test Zone', 'Renamed', 'Bad')");
+beforeEach(async () => {
+  await resetDb();
+  await cleanZones();
+});
 
 const GATE = { lat: -1.2189, lng: 36.8808, label: 'USIU-Africa, Gate A' };
 const KASARANI = { lat: -1.2216, lng: 36.9046, label: 'Kasarani' };
@@ -60,6 +65,7 @@ describe('admin dispatch tools', () => {
     expect((await api().post('/api/admin/zones').set(auth(admin.token)).send({ name: 'Bad', polygon: bowtie, neighbours: [] })).status).toBe(400);
     expect((await api().post('/api/admin/zones').set(auth(admin.token)).send({ name: 'Renamed', polygon: square(37, -1.1, 37.1, -1.05), neighbours: [] })).status).toBe(409);
     expect((await auditRows()).map((a) => a.action)).toEqual(expect.arrayContaining(['zone.create', 'zone.update']));
+    await cleanZones();
   });
 
   it('changes dispatch settings within limits, and audits it', async () => {

@@ -5,6 +5,6 @@ import { useAuth } from '../context/AuthContext'
 export default function StudentOnly() {
   const { profile } = useAuth()
   if (profile?.role === 'admin') return <Navigate to="/admin" replace />
-  if (profile?.role === 'driver') return <Navigate to="/driver" replace />
+  if (profile?.role === 'driver') return <Navigate to="/drive" replace />
   return <Outlet />
 }

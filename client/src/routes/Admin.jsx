@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router'
 import { ShieldCheck } from 'lucide-react'
 import { Analytics, Dashboard, DriverApplications, Incidents } from './AdminSections.jsx'
+import { DispatchTools, LiveOps, Zones } from './AdminDispatch.jsx'
 import { Button } from '../components/ui/Button.jsx'
 import { TextField } from '../components/ui/Field.jsx'
 import { Panel, Alert, PageTitle } from '../components/ui/Panel.jsx'
@@ -15,7 +16,10 @@ const TABS = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'users', label: 'Users' },
   { id: 'drivers', label: 'Driver applications' },
+  { id: 'live', label: 'Live map' },
   { id: 'incidents', label: 'Incident reports' },
+  { id: 'zones', label: 'Zones' },
+  { id: 'dispatch', label: 'Dispatch' },
   { id: 'payments', label: 'Payments' },
   { id: 'audit', label: 'Audit log' },
   { id: 'analytics', label: 'Analytics' },
@@ -54,6 +58,9 @@ export default function Admin() {
           {tab === 'dashboard' && <Dashboard />}
           {tab === 'users' && <People myId={profile.userId} />}
           {tab === 'drivers' && <DriverApplications />}
+          {tab === 'live' && <LiveOps />}
+          {tab === 'zones' && <Zones />}
+          {tab === 'dispatch' && <DispatchTools />}
           {tab === 'incidents' && <Incidents initialId={params.get('id')} />}
           {tab === 'payments' && <Payments />}
           {tab === 'audit' && <Audit />}

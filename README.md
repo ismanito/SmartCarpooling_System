@@ -140,7 +140,19 @@ For demos without driving, set `VITE_DEMO_TOOLS=true` in `client/.env` to show *
 
 Every request, answer, cancellation, finished ride and safety report creates an in-app notification (the bell in the top bar). The key ones also send an email. Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` and `MAIL_FROM` in `server/.env`. Without `SMTP_HOST`, emails are printed in the API terminal instead.
 
-## How a ride works (Sprint III)
+## Ride Now and Book
+
+Students tap **Ride Now** (or **Book**, optionally repeating on chosen days). The system offers the request to the nearest suitable online driver, pools students going to the same area into one car, and everyone pays an equal share of the fuel cost for the part of the road they shared. No commission, no surge pricing. Drivers go online (**Drive**) and answer requests; they no longer post trips.
+
+Full details, the dispatch algorithm as built, test and simulation results, and the list of proposal sections to update are in [docs/RIDE_NOW.md](docs/RIDE_NOW.md). Screenshots are in `docs/screenshots`.
+
+Demo (two phones or browser windows, and the admin): sign up with `name@demo.ridemate.test` addresses (verified automatically). Driver: add a vehicle, open **Drive**, pick a demo location, **GO ONLINE**. Rider: search "Roysambu", **Ride Now**, confirm. Driver: **Accept**. A second rider asking for the same area is pooled into the same car. Driver: Arrived, Picked up, Dropped off, slide to complete. Both rate. Admin: **Live map**, **Zones**, **Dispatch** (analytics, request log, settings).
+
+`npm --prefix server run simulate` runs 20 drivers and 60 requests against the test database and prints the figures for the report.
+
+The old trip-posting screens are kept under **Classic carpool (old)** until you confirm they can go.
+
+## Classic carpool (deprecated): how a ride works
 
 1. A rider asks for a seat (or a driver invites a rider). The other side gets a notification and an email.
 2. The driver accepts or declines. Accepting locks the seat in one transaction, so two riders can never take the last seat.
