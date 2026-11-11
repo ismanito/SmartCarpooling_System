@@ -28,12 +28,20 @@ function createApp({ verifyIdToken, markEmailVerified, config = defaultConfig } 
   app.use('/api/auth', require('./routes/auth'));
   app.use('/api/users', require('./routes/users'));
   app.use('/api/vehicles', require('./routes/vehicles'));
+  // Ride Now / Book. These run before the classic carpool routes, which stay mounted below.
+  const driverRoutes = require('./routes/driverApp');
+  app.use('/api/requests', require('./routes/requests'));
+  app.use('/api/driver', driverRoutes.driver);
+  app.use('/api/offers', driverRoutes.offers);
+  app.use('/api/rides', driverRoutes.rides);
+  app.use('/api/ride-shares', driverRoutes.shares);
   app.use('/api/rides', require('./routes/rides'));
   app.use('/api/rides', require('./routes/rideDetails'));
   app.use('/api/notifications', require('./routes/notifications'));
   app.use('/api/payments', require('./routes/payments'));
   app.use('/api/drivers', require('./routes/drivers'));
   app.use('/api/admin', require('./routes/admin'));
+  app.use('/api/admin', require('./routes/adminDispatch'));
 
   app.use(notFoundHandler);
   app.use(errorHandler);
