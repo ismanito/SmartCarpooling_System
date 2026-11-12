@@ -3,25 +3,20 @@
 # Steps and the order to do them in are in docs/DEPLOY_RENDER.md.
 databases:
   - name: ridemate-db
-    plan: basic-256mb
+    plan: free
     postgresMajorVersion: '16'
 
 services:
-  # ---- API. Starter (not free) because it keeps a persistent disk for driver documents,
-  # runs the dispatch timers and holds websocket connections, so it must not sleep.
+  # ---- API (free plan, for demos). Free services sleep after 15 minutes without traffic and have no
+  # persistent disk, so uploaded driver documents are lost on restart. Move to a paid plan with a disk for real use.
   - type: web
     name: ridemate-api
     runtime: node
     rootDir: server
-    plan: starter
+    plan: free
     buildCommand: npm ci
-    preDeployCommand: node scripts/migrate.js
-    startCommand: node src/index.js
+    startCommand: node scripts/migrate.js && node src/index.js
     healthCheckPath: /api/health
-    disk:
-      name: ridemate-private-docs
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
@@ -30,7 +25,7 @@ services:
       - key: DATABASE_URL
         fromDatabase: { name: ridemate-db, property: connectionString }
       - key: PRIVATE_DOCS_DIR
-        value: /var/data/private-docs
+        value: /tmp/private-docs
       - key: DOC_SIGNING_SECRET
         generateValue: true
       - key: ALLOWED_EMAIL_DOMAINS

@@ -28,6 +28,6 @@
 6. Create the demo accounts against the live API: set `API_URL` to the API address and run `npm --prefix server run demo-accounts` with `DATABASE_URL` set to the database's **external** connection string.
 
 ## Notes
-- The API uses the **Starter** plan and the database a paid plan: free web services sleep, cannot keep a disk (driver documents) and the free database expires.
-- Driver documents live on the API's disk at `/var/data/private-docs`. Back them up before deleting the service.
+- Everything is on Render's free plans, so no payment is needed. Limits: the API and matcher sleep after 15 minutes idle (the first request then takes about a minute), the free database expires after 30 days, and driver documents are lost when the API restarts.
+- For real use, move the API to a paid plan, add a disk at `/var/data` and set `PRIVATE_DOCS_DIR=/var/data/private-docs`; use a paid database.
 - `DEMO_EMAIL_DOMAINS` lets `@demo.ridemate.test` accounts skip email checks. Clear it when you stop demonstrating.
