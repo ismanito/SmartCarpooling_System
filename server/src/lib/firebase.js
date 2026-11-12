@@ -44,4 +44,4 @@ async function markEmailVerified(uid) {
   await getFirebaseAuth().updateUser(uid, { emailVerified: true });
 }
 
-module.exports = { verifyIdToken, markEmailVerified };
+module.exports = { verifyIdToken, markEmailVerified, getFirebaseAuth };

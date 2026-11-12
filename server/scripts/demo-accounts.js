@@ -33,8 +33,14 @@ async function firebaseUid(email) {
   if (created.ok) return created.data;
   if (created.data?.error?.message !== 'EMAIL_EXISTS') throw new Error(`${email}: ${created.data?.error?.message}`);
   const signedIn = await identity('signInWithPassword', { email, password: PASSWORD });
-  if (!signedIn.ok) throw new Error(`${email} already exists in Firebase with a different password`);
-  return signedIn.data;
+  if (signedIn.ok) return signedIn.data;
+  // The account exists with another password: reset it with the Admin SDK, then sign in again.
+  const auth = require('../src/lib/firebase').getFirebaseAuth();
+  const existing = await auth.getUserByEmail(email);
+  await auth.updateUser(existing.uid, { password: PASSWORD, emailVerified: true });
+  const again = await identity('signInWithPassword', { email, password: PASSWORD });
+  if (!again.ok) throw new Error(`${email}: ${again.data?.error?.message}`);
+  return again.data;
 }
 
 async function main() {
