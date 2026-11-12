@@ -1,5 +1,5 @@
 const { errors } = require('../lib/errors');
-const { canUseApp } = require('../lib/emailDomain');
+const { canUseApp, emailKind } = require('../lib/emailDomain');
 const usersRepo = require('../repositories/users');
 
 function bearerToken(req) {
@@ -43,6 +43,13 @@ function requireAuth({ profile = true, allowUnverified = false } = {}) {
     // Never runs against real Firebase.
     if (!user && req.app.locals.config.firebase?.useEmulator) {
       user = await usersRepo.relinkByEmail(identity.uid, identity.email.toLowerCase());
+    }
+    // External drivers cannot create an account until the RideMate team has approved their application.
+    const cfg = req.app.locals.config;
+    if (!user && cfg.externalRequiresApplication && emailKind(identity.email, cfg) === 'driver') {
+      if (!(await require('../services/applicants').approvedFor(identity.email))) {
+        throw errors.forbidden('AUTH_DRIVER_NOT_APPROVED', 'External drivers must apply and be approved before creating an account. Apply at /apply.');
+      }
     }
     if (user && user.status === 'suspended') {
       throw errors.forbidden('USER_SUSPENDED', 'Your account has been suspended. Contact the RideMate team.');

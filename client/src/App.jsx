@@ -26,6 +26,7 @@ import RideHome from './routes/RideHome.jsx'
 import DriverVerification from './routes/DriverVerification.jsx'
 import DriverSticker from './routes/DriverSticker.jsx'
 import PublicDriver from './routes/PublicDriver.jsx'
+import ApplyDriver from './routes/ApplyDriver.jsx'
 import RiderHistory from './routes/RiderHistory.jsx'
 import DriverPages from './routes/DriverPages.jsx'
 import DriverHome from './routes/DriverHome.jsx'
@@ -37,6 +38,8 @@ export default function App() {
     <Routes>
       {/* The page behind the windscreen sticker's QR code. Open to everyone. */}
       <Route path="/verified/:token" element={<PublicDriver />} />
+      {/* External drivers apply here before they have an account. Open to everyone. */}
+      <Route path="/apply" element={<ApplyDriver />} />
       <Route element={<AuthLayout />}>
         <Route element={<ProtectedRoute need="guest" />}>
           <Route path="/login" element={<Login />} />

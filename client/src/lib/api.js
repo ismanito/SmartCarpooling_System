@@ -27,8 +27,19 @@ export class ApiError extends Error {
   }
 }
 
+let applicantToken = null
+/** While someone is applying (no account yet) the verification and vehicle calls use their reference code. */
+export function setApplicantToken(token) {
+  applicantToken = token || null
+}
+
 async function request(path, { method = 'GET', body, auth = true } = {}) {
   const headers = { Accept: 'application/json' }
+  if (applicantToken && (path.startsWith('/driver/verification') || path.startsWith('/vehicles'))) {
+    path = `/apply${path.replace(/^\/driver/, '')}`
+    headers['X-Application-Token'] = applicantToken
+    auth = false
+  }
   const isForm = typeof FormData !== 'undefined' && body instanceof FormData // file uploads: the browser sets the type
   if (body !== undefined && !isForm) headers['Content-Type'] = 'application/json'
   if (auth) {
@@ -117,6 +128,8 @@ export const api = {
   completeOffer: (id) => request(`/rides/offers/${id}/complete`, { method: 'POST' }),
   rateBooking: (id, stars) => request(`/rides/bookings/${id}/rate`, { method: 'POST', body: { stars } }),
 
+  // External driver applications (no account yet)
+  startApplication: (body) => request('/apply', { method: 'POST', body, auth: false }),
   // Driver verification
   verification: () => request('/driver/verification'),
   startVerification: (body) => request('/driver/verification/start', { method: 'POST', body }),

@@ -25,8 +25,11 @@ const yearsSince = (iso) => {
 }
 
 /** The "Become a driver" page: shows where your verification stands, and walks you through it. */
-export default function DriverVerification() {
-  const { profile, reloadProfile } = useAuth()
+export default function DriverVerification({ applicant = null, title = 'Become a driver' }) {
+  const auth = useAuth()
+  // An applicant has no account yet: their name comes from the application and there is no profile to refresh.
+  const profile = applicant ? { fullName: applicant.fullName, role: 'driver', personType: 'student' } : auth.profile
+  const reloadProfile = applicant ? async () => {} : auth.reloadProfile
   const { data: v, error, reload } = useLive(api.verification, { pollMs: 20000 })
   const refresh = useCallback(async () => {
     await reload()
@@ -38,7 +41,7 @@ export default function DriverVerification() {
   const wizard = !v.started || ['not_started', 'rejected', 'expired'].includes(v.status)
   return (
     <div className="mx-auto w-full max-w-2xl space-y-5">
-      <PageTitle>Become a driver</PageTitle>
+      <PageTitle>{title}</PageTitle>
       {v.expiring?.length > 0 && v.status === 'approved' && (
         <Alert tone="info">
           {v.expiring.map((e) => `Your ${e.item.replace('_', ' ')} runs out on ${e.date}`).join('. ')}. Update it before then so you can keep driving.

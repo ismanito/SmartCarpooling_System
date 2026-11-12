@@ -7,6 +7,7 @@ const rules = require('../lib/verification');
 const files = require('../lib/files');
 const { requireAuth } = require('../middleware/auth');
 const { requireRole } = require('../middleware/requireRole');
+const { memberOrApplicant } = require('../middleware/applicant');
 const { validateBody, uuidParam } = require('../middleware/validate');
 const verification = require('../services/verification');
 
@@ -22,7 +23,7 @@ const oneFile = (req, res, next) =>
 // ---------------------------------------------------------------- the driver (/api/driver/verification)
 // Each person can only ever reach their own record, because every call uses the signed-in user's id.
 const driver = Router();
-driver.use(requireAuth(), requireRole('student', 'driver'));
+driver.use(memberOrApplicant('student', 'driver')); // external applicants reach it with their reference code
 
 const user = (req) => ({ userId: req.user.userId, role: req.user.role, profile: req.user.profile });
 

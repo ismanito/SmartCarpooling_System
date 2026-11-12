@@ -28,11 +28,15 @@ router.get('/domains', publicLimiter, (req, res) => {
 });
 
 /** Public: whether an email's domain may register. */
-router.post('/check-domain', publicLimiter, validateBody(checkDomainSchema), (req, res) => {
+router.post('/check-domain', publicLimiter, validateBody(checkDomainSchema), async (req, res) => {
   const { allowedEmailDomains, adminEmails = [], allowDriverSignup = false, demoEmailDomains = [] } = req.app.locals.config;
   const kind = emailKind(req.body.email, req.app.locals.config);
+  const gated = kind === 'driver' && req.app.locals.config.externalRequiresApplication;
+  const application = gated ? await require('../services/applicants').statusForEmail(req.body.email) : undefined;
   res.json({
-    allowed: canUseApp(req.body.email, allowedEmailDomains, adminEmails, allowDriverSignup),
+    allowed: canUseApp(req.body.email, allowedEmailDomains, adminEmails, allowDriverSignup) && (!gated || application === 'approved'),
+    needsApplication: gated && application !== 'approved' ? true : undefined,
+    application, // 'none' | 'not_started' | 'pending_review' | 'rejected' | 'approved' (external drivers only)
     staff: isAdminEmail(req.body.email, adminEmails),
     kind, // 'student' | 'driver' | 'admin' | null
     demo: kind === 'student' && demoEmailDomains.includes(emailDomain(req.body.email)),

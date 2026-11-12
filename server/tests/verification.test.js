@@ -13,7 +13,7 @@ const verification = require('../src/services/verification');
 const dispatch = require('../src/services/dispatch');
 const files = require('../src/lib/files');
 
-const app = request(createApp({ verifyIdToken: fakeVerifyIdToken, config: { ...config, allowDriverSignup: true } }));
+const app = request(createApp({ verifyIdToken: fakeVerifyIdToken, config: { ...config, allowDriverSignup: true, externalRequiresApplication: false } }));
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ridemate-docs-'));
 useStorage(new LocalStorage(tmp));
 

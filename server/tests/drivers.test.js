@@ -11,7 +11,7 @@ const app = request(
   createApp({
     verifyIdToken: fakeVerifyIdToken,
     markEmailVerified: async (uid) => verified.push(uid),
-    config: { ...config, allowDriverSignup: true, demoEmailDomains: ['demo.test'], allowedEmailDomains: ['usiu.ac.ke', 'demo.test'] },
+    config: { ...config, allowDriverSignup: true, externalRequiresApplication: false, demoEmailDomains: ['demo.test'], allowedEmailDomains: ['usiu.ac.ke', 'demo.test'] },
   }),
 );
 

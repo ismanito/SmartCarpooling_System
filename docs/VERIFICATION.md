@@ -27,6 +27,17 @@ RideMate verifies every driver before they can carry passengers. Riders are alwa
 - `DOC_SIGNING_SECRET`: secret for the 5-minute document links.
 - Settings (admin, Matching settings tab): min licence years, expiry warning days, re-check months, document retention days, auto-suspend rating/ratings/incidents, random selfie percent, `external_drivers_enabled` (default false).
 
+## External drivers apply before they have an account
+
+External drivers (not students or staff) cannot simply sign up. The flow is:
+
+1. They open `/apply`, give their name, email and phone, and get a reference code (shown once, stored only as a hash).
+2. With that code they fill in the same wizard as everyone else: consent, ID, licence, live selfie, vehicle, insurance, good conduct certificate, PSV badge, inspection report.
+3. When they submit, it appears in the admin verification queue. Approval needs a senior admin and the in-person check.
+4. Only after approval can the same email create an account (Sign up, Driver). The approved application becomes the account, so documents, vehicle and approval carry over. A pending or rejected applicant cannot create an account.
+
+Behind the scenes an applicant is a `users` row with a placeholder sign-in id (`applicant:<uuid>`) plus a `driver_applicants` row, so the admin review code is unchanged. Set `EXTERNAL_REQUIRE_APPLICATION=false` to go back to open Gmail sign-up with approval afterwards. Applications still need the external track switched on (`external_drivers_enabled`). Screenshots: `docs/screenshots/verification/19` to `21`.
+
 ## Known limits
 
 - Storage is local; a cloud adapter is not built.

@@ -32,6 +32,7 @@ function createApp({ verifyIdToken, markEmailVerified, config = defaultConfig } 
   const driverRoutes = require('./routes/driverApp');
   app.use('/api/requests', require('./routes/requests'));
   const verificationRoutes = require('./routes/verification');
+  app.use('/api/apply', require('./routes/apply')); // external drivers applying before they have an account
   app.use('/api/driver/verification', verificationRoutes.driver); // before /api/driver: unverified people must reach it
   app.use('/api/driver', driverRoutes.driver);
   app.use('/api/offers', driverRoutes.offers);

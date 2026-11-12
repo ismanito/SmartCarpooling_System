@@ -401,11 +401,12 @@ async function approve({ admin, driverId, ip }) {
       [driverId, admin.userId, next],
     );
     await appendAudit(client, { userId: admin.userId, action: isRecheck ? 'verification.recheck_approve' : 'verification.approve', entity: 'driver_verification', entityId: driverId, ipAddress: ip, details: { driver_id: driverId, driver_type: v.driver_type } });
+    const unclaimed = (await client.query('SELECT 1 FROM driver_applicants WHERE user_id = $1 AND claimed_at IS NULL', [driverId])).rowCount > 0;
     await notify(client, {
       userId: driverId,
       type: 'verification.approved',
-      message: isRecheck ? 'Your re-check was approved. You stay verified.' : 'You are now a Verified Driver. You can go online and take ride requests.',
-      link: '/drive/dashboard',
+      message: isRecheck ? 'Your re-check was approved. You stay verified.' : unclaimed ? 'Your driver application was approved. Create your RideMate driver account with this same email address to start driving.' : 'You are now a Verified Driver. You can go online and take ride requests.',
+      link: unclaimed ? '/signup/driver' : '/drive/dashboard',
       email: true,
     });
     return { type: v.driver_type };

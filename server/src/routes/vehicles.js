@@ -4,6 +4,7 @@ const { errors, PG } = require('../lib/errors');
 const { changedFields } = require('../lib/changes');
 const { requireAuth } = require('../middleware/auth');
 const { requireRole } = require('../middleware/requireRole');
+const { memberOrApplicant } = require('../middleware/applicant');
 const { validateBody, uuidParam } = require('../middleware/validate');
 const { createVehicleSchema, updateVehicleSchema } = require('../schemas/vehicle');
 const { appendAudit } = require('../services/audit');
@@ -11,7 +12,7 @@ const vehiclesRepo = require('../repositories/vehicles');
 const ridesRepo = require('../repositories/rides');
 
 const router = Router();
-router.use(requireAuth(), requireRole('student', 'driver'));
+router.use(memberOrApplicant('student', 'driver'));
 
 function plateConflict(err) {
   if (err.code === PG.UNIQUE_VIOLATION) {

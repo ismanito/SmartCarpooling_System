@@ -49,6 +49,12 @@ router.post('/', requireAuth({ profile: false }), profileBody, async (req, res) 
     const user = await withTransaction(async (client) => {
       const { licenceNumber, idNumber, about, accountType, ...profile } = req.body; // personType rides along for riders
       void accountType;
+      if (kind === 'driver' && req.app.locals.config.externalRequiresApplication) {
+        // The approved application becomes the account: its documents, vehicle and approval carry over.
+        const claimed = await require('../services/applicants').claim(client, { email: req.auth.email, firebaseUid: req.auth.uid, fullName: profile.fullName, phoneNumber: profile.phoneNumber });
+        if (!claimed) throw errors.forbidden('AUTH_DRIVER_NOT_APPROVED', 'External drivers must apply and be approved before creating an account.');
+        return usersRepo.findById(claimed, client);
+      }
       const row = await usersRepo.create(client, {
         firebaseUid: req.auth.uid,
         email: req.auth.email,

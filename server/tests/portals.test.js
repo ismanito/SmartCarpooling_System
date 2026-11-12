@@ -6,7 +6,7 @@ const { fakeVerifyIdToken } = require('./helpers/fakeAuth');
 
 beforeEach(resetDb);
 
-const app = request(createApp({ verifyIdToken: fakeVerifyIdToken, config: { ...config, allowDriverSignup: true } }));
+const app = request(createApp({ verifyIdToken: fakeVerifyIdToken, config: { ...config, allowDriverSignup: true, externalRequiresApplication: false } }));
 
 const GATE = { lat: -1.2189, lng: 36.8808, label: 'USIU-Africa, Gate A' };
 const KASARANI = { lat: -1.2216, lng: 36.9046, label: 'Kasarani' };
@@ -92,7 +92,7 @@ describe('dashboards', () => {
 });
 
 describe('driver accounts on demo domains', () => {
-  const demoApp = request(createApp({ verifyIdToken: fakeVerifyIdToken, config: { ...config, allowDriverSignup: true, studentsCanDrive: false, demoEmailDomains: ['demo.test'], allowedEmailDomains: ['usiu.ac.ke', 'demo.test'] } }));
+  const demoApp = request(createApp({ verifyIdToken: fakeVerifyIdToken, config: { ...config, allowDriverSignup: true, externalRequiresApplication: false, studentsCanDrive: false, demoEmailDomains: ['demo.test'], allowedEmailDomains: ['usiu.ac.ke', 'demo.test'] } }));
 
   it('a demo address can open a driver account when asked, but a real university address cannot', async () => {
     const form = { fullName: 'Dan Demo', phoneNumber: '0712345678', accountType: 'driver' };

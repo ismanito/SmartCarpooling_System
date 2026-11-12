@@ -13,7 +13,7 @@ const CARDS = [
     to: '/signup/driver',
     icon: Car,
     title: 'Driver',
-    text: 'Share a journey you are already making. Any email works, and the RideMate team checks your details first.',
+    text: 'Share a journey you are already making. Students and staff drivers sign up with their university email. Other drivers apply first: the RideMate team checks you before you can create an account.',
   },
 ]
 
@@ -38,6 +38,9 @@ export default function SignUpChoose() {
           </li>
         ))}
       </ul>
+      <p className="mt-5 text-center text-sm text-ink">
+        Not a student or staff member? <Link to="/apply" className="font-medium underline underline-offset-4">Apply to drive</Link>
+      </p>
       <p className="mt-5 flex items-center justify-center gap-2 text-sm">
         <ShieldCheck size={16} aria-hidden />
         <Link to="/signup/admin" className="text-ink underline underline-offset-4">

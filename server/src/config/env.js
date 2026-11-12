@@ -18,6 +18,8 @@ const schema = z.object({
   ALLOWED_EMAIL_DOMAINS: z.string().min(1, 'ALLOWED_EMAIL_DOMAINS is required'),
   ADMIN_EMAILS: z.string().optional().default(''),
   ALLOW_DRIVER_SIGNUP: boolFromString,
+  // true: an external driver must apply and be approved before they may create an account
+  EXTERNAL_REQUIRE_APPLICATION: z.string().optional().default('true').transform((v) => v !== 'false'),
   PRIVATE_DOCS_DIR: z.string().optional().default(''),
   SENIOR_ADMIN_EMAILS: z.string().optional().default(''),
   DEMO_EMAIL_DOMAINS: z.string().optional().default(''),
@@ -70,6 +72,7 @@ function loadConfig(source = process.env) {
     allowedEmailDomains: [...new Set([...parseDomains(env.ALLOWED_EMAIL_DOMAINS), ...parseDomains(env.DEMO_EMAIL_DOMAINS)])],
     demoEmailDomains: parseDomains(env.DEMO_EMAIL_DOMAINS),
     allowDriverSignup: env.ALLOW_DRIVER_SIGNUP,
+    externalRequiresApplication: env.EXTERNAL_REQUIRE_APPLICATION,
     privateDocsDir: env.PRIVATE_DOCS_DIR,
     seniorAdminEmails: parseEmails(env.SENIOR_ADMIN_EMAILS),
     adminEmails: parseEmails(env.ADMIN_EMAILS),

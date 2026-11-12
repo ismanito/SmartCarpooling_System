@@ -23,9 +23,9 @@ export const ACCOUNT_TYPES = {
   },
   driver: {
     title: 'Driver',
-    intro: 'Share a journey you are already making. Any email works, such as Gmail. The RideMate team checks your details before you can drive.',
+    intro: 'Share a journey you are already making. Students and staff drive with their university email. Anyone else must apply first at /apply: the RideMate team checks you, and only approved drivers can create an account.',
     placeholder: 'name@gmail.com',
-    hint: 'Any email except a university address. You verify it, then apply to drive.',
+    hint: 'The email your application was approved for. Not applied yet? Use Apply to drive.',
     allows: (kind, demo) => kind === 'driver' || (kind === 'student' && demo),
     wrong: 'University emails are for students and staff. Use a different email to apply as a driver.',
   },
@@ -50,6 +50,7 @@ function SignUpForm({ type, account }) {
   const navigate = useNavigate()
   const { signUp } = useAuth()
   const [serverError, setServerError] = useState(null)
+  const [application, setApplication] = useState(null) // set when an external driver still has to apply
   const [isLoading, setIsLoading] = useState(false)
 
   const {
@@ -68,9 +69,14 @@ function SignUpForm({ type, account }) {
 
   const onSubmit = async (data) => {
     setServerError(null)
+    setApplication(null)
     setIsLoading(true)
     try {
       const check = await api.checkDomain(data.email)
+      if (check.needsApplication) {
+        setApplication(check.application)
+        return
+      }
       if (!account.allows(check.kind, check.demo)) {
         setServerError(account.wrong)
         return
@@ -98,6 +104,14 @@ function SignUpForm({ type, account }) {
       <PageTitle className="mb-2">{account.title} account</PageTitle>
       <p className="mb-5 text-sm text-ink/85">{account.intro}</p>
       {serverError && <Alert tone="error">{serverError}</Alert>}
+      {application && (
+        <Alert tone="error">
+          {application === 'none' && 'External drivers must apply first. Once the RideMate team approves your application you can create your account here.'}
+          {(application === 'not_started' || application === 'pending_review') && 'Your application has not been approved yet. You can create your account once it is.'}
+          {application === 'rejected' && 'Your application was not approved, so an account cannot be created. Open your application to see why and send it again.'}{' '}
+          <Link to="/apply" className="font-medium underline underline-offset-4">{application === 'none' ? 'Apply to drive' : 'Open my application'}</Link>
+        </Alert>
+      )}
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <Field
           label="Email"
