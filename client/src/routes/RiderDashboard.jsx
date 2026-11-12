@@ -40,6 +40,16 @@ export default function RiderDashboard() {
         </div>
       </header>
 
+      {profile.driverStatus === 'approved' && (
+        <section aria-label="Driver mode" className="flex flex-wrap items-center justify-between gap-3 rounded-(--radius-panel) border border-mint bg-surface p-5">
+          <div>
+            <p className="font-display text-3xl leading-none font-semibold tracking-wide uppercase">You are a Verified Driver</p>
+            <p className="mt-1 text-sm text-ink/85">Switch to driver mode to go online, see your earnings and print your sticker.</p>
+          </div>
+          <Button to="/drive/dashboard">Open driver dashboard</Button>
+        </section>
+      )}
+
       {live && (
         <section aria-label="Current ride" className="flex flex-wrap items-center justify-between gap-3 rounded-(--radius-panel) bg-asphalt p-5 text-paper">
           <div>

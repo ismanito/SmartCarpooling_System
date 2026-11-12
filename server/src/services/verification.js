@@ -405,7 +405,7 @@ async function approve({ admin, driverId, ip }) {
       userId: driverId,
       type: 'verification.approved',
       message: isRecheck ? 'Your re-check was approved. You stay verified.' : 'You are now a Verified Driver. You can go online and take ride requests.',
-      link: '/',
+      link: '/drive/dashboard',
       email: true,
     });
     return { type: v.driver_type };

@@ -67,6 +67,7 @@ function StatusCard({ v }) {
           </p>
           <p className="mt-1 text-sm text-paper/90">You can go online and take ride requests. Papers are re-checked every few months.</p>
           <p className="mt-2 flex flex-wrap gap-3 text-sm">
+            <Link to="/drive/dashboard" className="font-semibold underline underline-offset-4">Open your driver dashboard</Link>
             <Link to="/drive" className="underline underline-offset-4">Go to the map</Link>
             <Link to="/drive/sticker" className="underline underline-offset-4">Print your windscreen sticker</Link>
           </p>
