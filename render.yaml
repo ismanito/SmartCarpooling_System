@@ -31,19 +31,19 @@ services:
       - key: ALLOWED_EMAIL_DOMAINS
         value: usiu.ac.ke
       - key: ADMIN_EMAILS
-        sync: false # real (non-student) admin emails, comma separated
+        value: 'ismahanabdijay@gmail.com'
       - key: SENIOR_ADMIN_EMAILS
-        sync: false # who may approve external drivers and switch that track on
+        value: 'ismahanabdijay@gmail.com'
       - key: ALLOW_DRIVER_SIGNUP
         value: 'true'
       - key: DEMO_EMAIL_DOMAINS
         value: demo.ridemate.test # demo accounts only; clear this for real use
       - key: CORS_ORIGIN
-        sync: false # the ridemate-web URL, e.g. https://ridemate-web.onrender.com
+        value: 'https://ridemate-web.onrender.com'
       - key: APP_URL
-        sync: false # same URL
+        value: 'https://ridemate-web.onrender.com'
       - key: FIREBASE_PROJECT_ID
-        sync: false
+        value: 'ridemate-demo-isa26'
       - key: FIREBASE_USE_EMULATOR
         value: 'false'
       - key: GOOGLE_APPLICATION_CREDENTIALS
@@ -90,17 +90,17 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_BASE_URL
-        sync: false # https://ridemate-api.onrender.com/api
+        value: 'https://ridemate-api-ooyp.onrender.com/api'
       - key: VITE_SOCKET_URL
-        sync: false # https://ridemate-api.onrender.com
+        value: 'https://ridemate-api-ooyp.onrender.com'
       - key: VITE_FIREBASE_API_KEY
-        sync: false
+        value: 'AIzaSyCoIaEMsZ7-iWiQQA4d9evzGKcswm5kinQ'
       - key: VITE_FIREBASE_AUTH_DOMAIN
-        sync: false
+        value: 'ridemate-demo-isa26.firebaseapp.com'
       - key: VITE_FIREBASE_PROJECT_ID
-        sync: false
+        value: 'ridemate-demo-isa26'
       - key: VITE_FIREBASE_APP_ID
-        sync: false
+        value: '1:1013605811233:web:37141a594e37b2ca070f60'
       - key: VITE_FIREBASE_USE_EMULATOR
         value: 'false'
       - key: VITE_GOOGLE_MAPS_BROWSER_KEY
