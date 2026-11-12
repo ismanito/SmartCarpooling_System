@@ -47,9 +47,11 @@ export function usePlaces() {
       live = false
     }
   }, [])
+  // Addresses found by the address search join the list, so the rest of the screen treats them like any other place.
+  const addPlace = useCallback((place) => setList((l) => (l.some((p) => p.id === place.id) ? l : [...l, place])), [])
   const options = useMemo(() => list.filter((p) => !p.hidden).map((p) => ({ value: p.id, label: p.name })), [list])
   const byId = useMemo(() => Object.fromEntries(list.map((p) => [p.id, p])), [list])
-  return { options, byId, list, buildings, error }
+  return { options, byId, list, buildings, error, addPlace }
 }
 
 const REFRESH_MS = 20_000

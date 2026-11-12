@@ -117,6 +117,15 @@ router.get('/places', (req, res) => {
   res.json({ places: PLACES, campusBuildings: CAMPUS_BUILDINGS });
 });
 
+/** Address search: any street, estate or landmark in Nairobi, as a point the matching can use. */
+router.get('/geocode', async (req, res) => {
+  try {
+    res.json({ places: await require('../lib/geocode').geocode(req.query.q) });
+  } catch {
+    res.json({ places: [], unavailable: true }); // the picker still works with the built-in areas
+  }
+});
+
 /** Looks up a chosen place and, for campus gates, the building inside; field errors say which one is wrong. */
 function resolvePlace(id, buildingId, field) {
   const place = findPlace(id);

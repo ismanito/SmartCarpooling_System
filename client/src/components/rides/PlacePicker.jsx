@@ -1,6 +1,7 @@
-import { useId, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { MapPin, Search, X } from 'lucide-react'
 import { Button } from '../ui/Button.jsx'
+import { api } from '../../lib/api.js'
 
 const MAX_RESULTS = 8
 const norm = (s) => s.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim()
@@ -13,14 +14,37 @@ const CAMPUS_WORDS = ['usiu', 'campus', 'university', 'gate']
  *
  * value: { place: id, building: id | '' }. onChange gets the same shape.
  */
-export function PlacePicker({ label, value, onChange, places, buildings = [], error, placeholder = 'Search an area, e.g. Westlands' }) {
+export function PlacePicker({ label, value, onChange, places, buildings = [], error, onAddPlace, placeholder = 'Search an area or any address, e.g. Westlands' }) {
   const id = useId()
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
   const input = useRef(null)
 
-  const selectable = useMemo(() => places.filter((p) => !p.hidden), [places])
+  const [found, setFound] = useState([]) // addresses from the address search
+  const [searching, setSearching] = useState(false)
+  useEffect(() => {
+    const q = query.trim()
+    if (!onAddPlace || q.length < 3) {
+      setFound([])
+      return undefined
+    }
+    let live = true
+    setSearching(true)
+    const t = setTimeout(() => {
+      api
+        .geocode(q)
+        .then((r) => live && setFound(r.places || []))
+        .catch(() => live && setFound([]))
+        .finally(() => live && setSearching(false))
+    }, 500)
+    return () => {
+      live = false
+      clearTimeout(t)
+    }
+  }, [query, onAddPlace])
+
+  const selectable = useMemo(() => places.filter((p) => !p.hidden && !p.geo), [places])
   const gates = useMemo(() => selectable.filter((p) => p.campus), [selectable])
   const chosen = places.find((p) => p.id === value.place)
   const onCampus = Boolean(chosen?.campus)
@@ -38,10 +62,13 @@ export function PlacePicker({ label, value, onChange, places, buildings = [], er
         if (norm(b.name).includes(q)) list.push({ key: `b-${b.id}`, label: b.name, hint: 'Inside USIU-Africa', pick: { place: gates[0]?.id ?? '', building: b.id } })
       }
     }
-    return list.slice(0, MAX_RESULTS)
-  }, [query, selectable, buildings, gates])
+    const local = list.slice(0, MAX_RESULTS)
+    for (const g of found) local.push({ key: g.id, label: g.name, hint: 'Address', pick: { place: g.id, building: '' }, geo: g })
+    return local
+  }, [query, selectable, buildings, gates, found])
 
   const pick = (r) => {
+    if (r.geo) onAddPlace?.(r.geo)
     onChange(r.pick)
     setQuery('')
     setOpen(false)
@@ -123,7 +150,7 @@ export function PlacePicker({ label, value, onChange, places, buildings = [], er
           {open && (
             <ul id={listId} role="listbox" aria-label={`${label} results`} className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-(--radius-control) border border-ink/25 bg-surface shadow-xl">
               {results.length === 0 ? (
-                <li className="px-3 py-3 text-sm text-ink/85">No area matches “{query}”. Try a nearby landmark.</li>
+                <li className="px-3 py-3 text-sm text-ink/85">{searching ? 'Searching addresses…' : `Nothing found for “${query}”. Try a nearby landmark or estate name.`}</li>
               ) : (
                 results.map((r, i) => (
                   // The input keeps focus (arrow keys and Enter pick), so the row itself is the click target.

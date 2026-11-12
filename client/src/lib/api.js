@@ -103,6 +103,7 @@ export const api = {
 
   // Rides
   places: () => request('/rides/places'),
+  geocode: (q) => request(`/rides/geocode?q=${encodeURIComponent(q)}`),
   createOffer: (offer) => request('/rides/offers', { method: 'POST', body: offer }),
   myOffers: () => request('/rides/offers/mine'),
   offerMatches: (id) => request(`/rides/offers/${id}/matches`),

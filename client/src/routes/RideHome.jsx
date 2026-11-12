@@ -171,6 +171,7 @@ export default function RideHome() {
           <p className="font-display text-3xl leading-none font-semibold tracking-wide text-ink-deep uppercase">Hi, {profile?.fullName?.split(' ')[0]}</p>
           <PlacePicker
             label="Where to?"
+            onAddPlace={places.addPlace}
             places={places.list}
             buildings={places.buildings}
             value={dropPlace}
@@ -282,8 +283,8 @@ function ConfirmSheet({ kind, draft, setDraft, places, pickupPlace, onPickup, dr
       <p className="flex items-center gap-2 text-sm text-ink">
         <MapPin size={16} aria-hidden className="text-mint" /> <span className="font-medium">{pickup ? pickup.label : 'Choose a pick-up point'}</span>
       </p>
-      <PlacePicker label="Pick-up" places={places.list} buildings={places.buildings} value={pickupPlace} onChange={onPickup} placeholder="Search a pick-up, or drag the green pin" />
-      <PlacePicker label="Drop-off" places={places.list} buildings={places.buildings} value={dropPlace} onChange={onDrop} />
+      <PlacePicker label="Pick-up" onAddPlace={places.addPlace} places={places.list} buildings={places.buildings} value={pickupPlace} onChange={onPickup} placeholder="Search a pick-up, or drag the green pin" />
+      <PlacePicker label="Drop-off" onAddPlace={places.addPlace} places={places.list} buildings={places.buildings} value={dropPlace} onChange={onDrop} />
       {kind === 'scheduled' && (
         <>
           <TextField label="Pick-up time" type="datetime-local" min={localInputValue(10)} value={draft.when} onChange={(e) => setDraft({ ...draft, when: e.target.value })} />
