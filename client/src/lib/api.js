@@ -145,7 +145,9 @@ export const api = {
   adminRejectVerification: (id, reason) => request(`/admin/verifications/${id}/reject`, { method: 'POST', body: { reason } }),
   adminSuspendVerification: (id, reason) => request(`/admin/verifications/${id}/suspend`, { method: 'POST', body: { reason } }),
   adminReinstateVerification: (id) => request(`/admin/verifications/${id}/reinstate`, { method: 'POST' }),
-  adminDocumentUrl: (docId) => request(`/admin/documents/${docId}/url`),
+  // The API signs a path starting with /api. When the website and API are on different addresses, point it at the API.
+  adminDocumentUrl: (docId) =>
+    request(`/admin/documents/${docId}/url`).then((r) => ({ ...r, url: /^https?:/.test(BASE_URL) ? new URL(BASE_URL).origin + r.url : r.url })),
   adminSelfieChecks: (status) => request(`/admin/selfie-checks${qs({ status })}`),
   adminReviewSelfie: (id, status) => request(`/admin/selfie-checks/${id}`, { method: 'POST', body: { status } }),
   adminVerificationSettings: () => request('/admin/verification-settings'),

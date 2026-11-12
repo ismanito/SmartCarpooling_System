@@ -194,6 +194,8 @@ pub.get('/documents/:docId', limiter, uuidParam('docId'), async (req, res) => {
   res.set('Cache-Control', 'private, no-store');
   res.set('Content-Disposition', 'inline');
   res.set('X-Content-Type-Options', 'nosniff');
+  // The website and the API can live on different addresses (Render); the signed link is what keeps the file private.
+  res.set('Cross-Origin-Resource-Policy', 'cross-origin');
   res.send(buffer);
 });
 
