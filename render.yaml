@@ -1,20 +1,27 @@
-# Staging on Render: Postgres (with PostGIS), the Express API and the Python matcher.
-# Create it with "New > Blueprint" in Render and fill in the values marked sync: false.
+# RideMate on Render: Postgres (with PostGIS), the Express API, the Python matcher and the React site.
+# Create it with "New > Blueprint" in Render, pick this repo, and fill in the values marked sync: false.
+# Steps and the order to do them in are in docs/DEPLOY_RENDER.md.
 databases:
   - name: ridemate-db
-    plan: free
+    plan: basic-256mb
     postgresMajorVersion: '16'
 
 services:
+  # ---- API. Starter (not free) because it keeps a persistent disk for driver documents,
+  # runs the dispatch timers and holds websocket connections, so it must not sleep.
   - type: web
     name: ridemate-api
     runtime: node
     rootDir: server
-    plan: free
+    plan: starter
     buildCommand: npm ci
     preDeployCommand: node scripts/migrate.js
     startCommand: node src/index.js
     healthCheckPath: /api/health
+    disk:
+      name: ridemate-private-docs
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
@@ -22,14 +29,24 @@ services:
         value: 'true'
       - key: DATABASE_URL
         fromDatabase: { name: ridemate-db, property: connectionString }
+      - key: PRIVATE_DOCS_DIR
+        value: /var/data/private-docs
+      - key: DOC_SIGNING_SECRET
+        generateValue: true
       - key: ALLOWED_EMAIL_DOMAINS
         value: usiu.ac.ke
       - key: ADMIN_EMAILS
-        sync: false
+        sync: false # real (non-student) admin emails, comma separated
+      - key: SENIOR_ADMIN_EMAILS
+        sync: false # who may approve external drivers and switch that track on
+      - key: ALLOW_DRIVER_SIGNUP
+        value: 'true'
+      - key: DEMO_EMAIL_DOMAINS
+        value: demo.ridemate.test # demo accounts only; clear this for real use
       - key: CORS_ORIGIN
-        sync: false # the Vercel URL, e.g. https://ridemate-staging.vercel.app
+        sync: false # the ridemate-web URL, e.g. https://ridemate-web.onrender.com
       - key: APP_URL
-        sync: false # same Vercel URL
+        sync: false # same URL
       - key: FIREBASE_PROJECT_ID
         sync: false
       - key: FIREBASE_USE_EMULATOR
@@ -51,6 +68,7 @@ services:
       - key: MAIL_FROM
         sync: false
 
+  # ---- Matcher
   - type: web
     name: ridemate-matcher
     runtime: python
@@ -62,4 +80,33 @@ services:
       - key: DATABASE_URL
         fromDatabase: { name: ridemate-db, property: connectionString }
       - key: MATCHER_INTERNAL_KEY
-        sync: false # paste the same value Render generated for the API
+        sync: false # paste the same value Render generated for ridemate-api
+
+  # ---- Website (static). Calls the API directly, so the API's CORS_ORIGIN must be this site's URL.
+  - type: web
+    name: ridemate-web
+    runtime: static
+    rootDir: client
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false # https://ridemate-api.onrender.com/api
+      - key: VITE_SOCKET_URL
+        sync: false # https://ridemate-api.onrender.com
+      - key: VITE_FIREBASE_API_KEY
+        sync: false
+      - key: VITE_FIREBASE_AUTH_DOMAIN
+        sync: false
+      - key: VITE_FIREBASE_PROJECT_ID
+        sync: false
+      - key: VITE_FIREBASE_APP_ID
+        sync: false
+      - key: VITE_FIREBASE_USE_EMULATOR
+        value: 'false'
+      - key: VITE_GOOGLE_MAPS_BROWSER_KEY
+        sync: false
