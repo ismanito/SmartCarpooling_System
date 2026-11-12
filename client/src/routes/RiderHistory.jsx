@@ -24,7 +24,7 @@ export default function RiderHistory() {
       </StatGrid>
       {data.rides.length === 0 ? (
         <p className="text-sm text-ink/85">
-          No rides yet. <Link to="/" className="underline underline-offset-4">Ask for your first ride</Link>.
+          No rides yet. <Link to="/ride" className="underline underline-offset-4">Ask for your first ride</Link>.
         </p>
       ) : (
         <ul className="space-y-2">

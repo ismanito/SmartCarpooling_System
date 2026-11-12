@@ -11,7 +11,8 @@ import { InstallButton } from './InstallButton.jsx'
  *  - admins: the console
  */
 const RIDER_LINKS = [
-  { to: '/', label: 'Ride', end: true },
+  { to: '/', label: 'Dashboard', end: true },
+  { to: '/ride', label: 'Ride' },
   { to: '/bookings', label: 'My bookings' },
   { to: '/my-rides', label: 'My rides' },
   { to: '/become-driver', label: 'Become a driver' },
@@ -19,7 +20,8 @@ const RIDER_LINKS = [
 ]
 // A student or staff member who has been verified as a driver can switch to driving and back.
 const RIDER_WHO_DRIVE_LINKS = [
-  { to: '/', label: 'Ride', end: true },
+  { to: '/', label: 'Dashboard', end: true },
+  { to: '/ride', label: 'Ride' },
   { to: '/bookings', label: 'My bookings' },
   { to: '/my-rides', label: 'My rides' },
   { to: '/drive/dashboard', label: 'Driver mode' },

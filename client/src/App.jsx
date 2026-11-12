@@ -22,6 +22,7 @@ import MyRides from './routes/MyRides.jsx'
 import DriverApp from './routes/DriverApp.jsx'
 import Bookings from './routes/Bookings.jsx'
 import HomeByRole from './routes/HomeByRole.jsx'
+import RideHome from './routes/RideHome.jsx'
 import DriverVerification from './routes/DriverVerification.jsx'
 import DriverSticker from './routes/DriverSticker.jsx'
 import PublicDriver from './routes/PublicDriver.jsx'
@@ -62,6 +63,9 @@ export default function App() {
             <Route path="/my-rides" element={<RiderHistory />} />
           </Route>
           {/* Anyone (student, staff or external) becomes a driver here, and checks where their verification stands. */}
+          <Route element={<StudentOnly />}>
+            <Route path="/ride" element={<RideHome />} />
+          </Route>
           <Route path="/become-driver" element={<DriverVerification />} />
           {/* Driver portal */}
           <Route element={<DriverArea />}>

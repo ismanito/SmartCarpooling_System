@@ -59,7 +59,7 @@ export default function Bookings() {
     <div className="mx-auto w-full max-w-2xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <PageTitle>My bookings</PageTitle>
-        <Button to="/" variant="secondary" size="sm"><CalendarClock size={16} aria-hidden /> Book a ride</Button>
+        <Button to="/ride" variant="secondary" size="sm"><CalendarClock size={16} aria-hidden /> Book a ride</Button>
       </div>
       <p className="text-sm text-ink/85">We find your driver about 20 minutes before pick-up. Students going to the same place at the same time are pooled into one car.</p>
       {(error || problem) && <Alert tone="error">{problem || error}</Alert>}
@@ -67,7 +67,7 @@ export default function Bookings() {
         <Spinner />
       ) : groups.length === 0 ? (
         <p className="text-sm text-ink/85">
-          Nothing booked. <Link to="/" className="underline underline-offset-4">Book a ride</Link> for later, or make it repeat for your class days.
+          Nothing booked. <Link to="/ride" className="underline underline-offset-4">Book a ride</Link> for later, or make it repeat for your class days.
         </p>
       ) : (
         <ul className="space-y-3">
