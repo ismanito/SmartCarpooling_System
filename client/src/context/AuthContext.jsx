@@ -68,8 +68,9 @@ export function AuthProvider({ children }) {
   }, [])
 
   const signUp = useCallback(async (email, password) => {
-    const { allowed, demo } = await api.checkDomain(email)
-    if (!allowed) throw new ApiError(403, 'AUTH_DOMAIN_NOT_ALLOWED', 'Use your university email to create a student account, or any email to apply as a driver.')
+    const { allowed, demo, needsApplication } = await api.checkDomain(email)
+    if (needsApplication) throw new ApiError(403, 'AUTH_DRIVER_NOT_APPROVED', 'External drivers must apply and be approved before creating an account. Go to Apply to drive (the /apply page).')
+    if (!allowed) throw new ApiError(403, 'AUTH_DOMAIN_NOT_ALLOWED', 'Use your university email to create a student account. External drivers must apply first at /apply.')
     const { user } = await createUserWithEmailAndPassword(getFirebaseAuth(), email, password)
     if (demo) {
       // Demo accounts have no real inbox: the server verifies them, then we pick that up.
