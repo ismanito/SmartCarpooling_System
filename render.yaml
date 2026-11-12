@@ -15,7 +15,7 @@ services:
     rootDir: server
     plan: free
     buildCommand: npm ci
-    startCommand: node scripts/migrate.js && node src/index.js
+    startCommand: node scripts/migrate.js && (DEMO_DB_ONLY=1 node scripts/demo-accounts.js || true) && node src/index.js
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
@@ -36,6 +36,8 @@ services:
         value: 'ismahanabdijay@gmail.com'
       - key: ALLOW_DRIVER_SIGNUP
         value: 'true'
+      - key: FIREBASE_WEB_API_KEY
+        value: 'AIzaSyCoIaEMsZ7-iWiQQA4d9evzGKcswm5kinQ' # public web key; lets the demo-account step look up Firebase users
       - key: DEMO_EMAIL_DOMAINS
         value: demo.ridemate.test # demo accounts only; clear this for real use
       - key: CORS_ORIGIN

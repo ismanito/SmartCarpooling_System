@@ -43,8 +43,10 @@ async function main() {
   for (const a of ACCOUNTS) {
     const { localId: uid, idToken } = await firebaseUid(a.email);
     // Marks the email verified in Firebase (demo domains only; the API must be running).
+    if (!process.env.DEMO_DB_ONLY) {
     const v = await fetch(`${process.env.API_URL || 'http://localhost:4000'}/api/auth/demo-verify`, { method: 'POST', headers: { Authorization: `Bearer ${idToken}` } });
     if (!v.ok) throw new Error(`${a.email}: demo-verify failed (${v.status}). Is the API running and DEMO_EMAIL_DOMAINS set?`);
+    }
     const { rows } = await pool.query(
       `INSERT INTO users (firebase_uid, university_email, full_name, phone_number, faculty, role, person_type, is_verified)
        VALUES ($1, $2, $3, $4, $5, $6, $7, true)
