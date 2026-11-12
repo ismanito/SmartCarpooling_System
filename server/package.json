@@ -14,6 +14,7 @@
     "migrate": "node scripts/migrate.js",
     "migrate:test": "node scripts/migrate.js --test",
     "seed": "node scripts/seed.js",
+    "demo-accounts": "node scripts/demo-accounts.js",
     "make-admin": "node scripts/make-admin.js",
     "test": "jest --runInBand",
     "test:unit": "jest --config jest.unit.config.js",
