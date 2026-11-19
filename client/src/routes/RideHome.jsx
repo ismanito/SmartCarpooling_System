@@ -7,6 +7,7 @@ import { TextField } from '../components/ui/Field.jsx'
 import { Alert } from '../components/ui/Panel.jsx'
 import { LiveMap } from '../components/ride/LiveMap.jsx'
 import { PlacePicker } from '../components/rides/PlacePicker.jsx'
+import { MessageButton } from '../components/ride/ChatSheet.jsx'
 import { Avatar, BigPlate, MapStage, Sheet, Stars, kes, minutesUntil, nearestLabel, useNow } from '../components/ride/bits.jsx'
 import { usePlaces, localInputValue } from '../components/rides/RideBits.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -457,6 +458,7 @@ function TripSheet({ request, ride, onChange, onDismiss, onRetry, onBookLater })
           ))}
         </ol>
       )}
+      <MessageButton rideId={ride.ride.rideId} name={driver.firstName} fullWidth label={`Message ${driver.firstName}`} />
       <div className="grid grid-cols-3 gap-2">
         {driver.phoneNumber && (
           <Button to={`tel:${driver.phoneNumber}`} variant="secondary" size="sm"><Phone size={16} aria-hidden /> Call</Button>

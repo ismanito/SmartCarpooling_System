@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BarChart } from '../components/charts/Charts.jsx'
+import { BarChart, Mini, Ring, Tile, Trend } from '../components/charts/Charts.jsx'
 import { Download, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { Button } from '../components/ui/Button.jsx'
 import { SelectField, TextField } from '../components/ui/Field.jsx'
@@ -48,52 +48,99 @@ function Integrity({ chain }) {
   )
 }
 
-export function Dashboard() {
-  const { data, error } = useLoad(
-    () => Promise.all([api.adminDashboard(), api.adminVerifyAudit(), api.adminPayments()]).then(([s, chain, pay]) => ({ s: s.stats, chain, pay: pay.summary })),
-    [],
-  )
+const DAY_NUM = new Intl.DateTimeFormat(undefined, { day: 'numeric' })
+
+/** The console's front page: what is happening now, how the pilot is going, and what needs attention. */
+export function Dashboard({ go = () => {} }) {
+  const { data, error } = useLoad(() => Promise.all([api.adminOverview(), api.adminVerifyAudit()]).then(([o, chain]) => ({ o: o.overview, chain })), [])
   if (error) return <Alert tone="error">{error}</Alert>
   if (!data) return <Spinner />
-  const { s, chain, pay } = data
+  const { o, chain } = data
+  const pooledPct = o.ridesCompleted ? Math.round((o.pooledRides / o.ridesCompleted) * 100) : 0
+  const owed = Math.max(0, o.sharedKes - o.paidKes)
+  const paidPct = o.sharedKes ? Math.round((o.paidKes / o.sharedKes) * 100) : 0
+  const asked = o.outcomes.completed + o.outcomes.cancelled + o.outcomes.no_driver
+  const donePct = asked ? Math.round((o.outcomes.completed / asked) * 100) : 0
+  const days = o.daily.map((d) => ({ label: DAY_NUM.format(new Date(`${d.day}T12:00:00`)), value: d.rides }))
+  const alerts = [
+    o.openIncidents > 0 && { text: `${o.openIncidents} open safety report${o.openIncidents === 1 ? '' : 's'}`, tab: 'incidents', tone: 'bg-coral text-asphalt' },
+    o.pendingVerifications > 0 && { text: `${o.pendingVerifications} driver${o.pendingVerifications === 1 ? '' : 's'} waiting for review`, tab: 'verification', tone: 'bg-gold text-asphalt' },
+  ].filter(Boolean)
+
   return (
-    <div className="space-y-6">
-      <Integrity chain={chain} />
-      <StatGrid>
-        <StatTile label="Verified students" value={s.verifiedStudents} />
-        <StatTile label="Active trips" value={s.activeTrips} />
-        <StatTile label="Seat requests" value={s.matches} note={`${s.requests} ride requests`} />
-        <StatTile label="Completed rides" value={s.completedRides} />
-        <StatTile label="Average rating" value={s.avgRating ? s.avgRating.toFixed(1) : 'None yet'} />
-        <StatTile label="Estimated savings" value={kes(s.estimatedSavingsKes)} tone="good" note="Versus travelling alone" />
-        <StatTile label="Open reports" value={s.openIncidents} tone={s.openIncidents > 0 ? 'alert' : 'plain'} />
-        <StatTile label="Drivers" value={s.approvedDrivers} tone={s.pendingDrivers > 0 ? 'alert' : 'plain'} note={`${s.pendingDrivers} waiting for review`} />
-        <StatTile label="Unpaid fares" value={kes(pay.outstandingKes)} note={`${pay.unpaidFares} fares`} />
-      </StatGrid>
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Panel>
-          <SectionTitle>Rides per week</SectionTitle>
-          <div className="mt-4">
-            <WeeklyChart weeks={s.ridesPerWeek} />
-          </div>
-        </Panel>
-        <Panel>
-          <SectionTitle>Top routes</SectionTitle>
-          {s.topRoutes.length === 0 ? (
-            <p className="mt-3 text-sm text-ink/85">No trips yet.</p>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${chain.valid ? 'bg-asphalt text-paper' : 'bg-error text-surface'}`}>
+          {chain.valid ? <ShieldCheck size={14} aria-hidden className="text-gold" /> : <ShieldAlert size={14} aria-hidden />}
+          {chain.valid ? `Audit log intact · ${chain.checked} entries` : `Audit log altered at entry ${chain.firstBroken?.auditId}`}
+        </span>
+        {alerts.map((a) => (
+          <button key={a.tab} type="button" onClick={() => go(a.tab)} className={`focus-ring rounded-full px-3 py-1 text-xs font-semibold ${a.tone}`}>
+            {a.text} →
+          </button>
+        ))}
+        {alerts.length === 0 && <span className="text-xs text-ink/85">Nothing needs attention.</span>}
+      </div>
+
+      <div className="grid grid-cols-4 gap-2">
+        <Mini label="Students" value={o.verifiedStudents} note="verified" />
+        <Mini label="Drivers" value={o.approvedDrivers} note={`${o.onlineNow} online`} tone={o.onlineNow > 0 ? 'good' : 'plain'} />
+        <Mini label="Rides" value={o.ridesCompleted} note={`${o.activeRides} active`} />
+        <Mini label="Pooled" value={`${pooledPct}%`} note={`${o.pooledRides}/${o.ridesCompleted}`} />
+        <Mini label="Shared" value={o.sharedKes.toLocaleString('en-KE')} note="KES" tone="good" />
+        <Mini label="Unpaid" value={owed.toLocaleString('en-KE')} note="KES" tone={owed > 0 ? 'alert' : 'plain'} />
+        <Mini label="Rating" value={o.avgRating ? o.avgRating.toFixed(1) : 'None'} />
+        <Mini label="Reports" value={o.openIncidents} note="open" tone={o.openIncidents > 0 ? 'alert' : 'plain'} />
+      </div>
+
+      <div className="grid min-w-0 grid-cols-2 gap-3">
+        <Tile title="Rides per day" aside="last 14 days" className="col-span-2">
+          <BarChart data={days} height={84} label="Rides completed per day" />
+        </Tile>
+
+        <Tile title="How requests ended" aside="last 30 days" className="col-span-2 sm:col-span-1">
+          {asked === 0 ? (
+            <p className="text-sm text-ink/85">No ride requests yet.</p>
           ) : (
-            <ol className="mt-3 space-y-2">
-              {s.topRoutes.map((r, i) => (
-                <li key={`${r.origin}-${r.destination}`} className="flex items-center justify-between gap-3 text-sm">
-                  <span>
-                    {i + 1}. {r.origin} to {r.destination}
-                  </span>
-                  <span className="font-medium">{r.trips} trips</span>
+            <div className="flex items-center gap-4">
+              <div className="flex shrink-0 flex-col items-center gap-1">
+                <Ring value={donePct} size={60} label={`${donePct} percent of requests were completed`}>{donePct}%</Ring>
+                <span className="text-[10px] leading-3 text-ink/85">completed</span>
+              </div>
+              <ul className="min-w-0 flex-1 space-y-0.5 text-sm">
+                <li className="flex justify-between gap-2"><span>Completed</span><strong>{o.outcomes.completed}</strong></li>
+                <li className="flex justify-between gap-2"><span>Cancelled</span><strong>{o.outcomes.cancelled}</strong></li>
+                <li className="flex justify-between gap-2"><span>No driver found</span><strong>{o.outcomes.no_driver}</strong></li>
+              </ul>
+            </div>
+          )}
+        </Tile>
+
+        <Tile title="Cost shared" aside={`${paidPct}% paid`} className="hidden sm:block">
+          {o.sharedKes === 0 ? (
+            <p className="text-sm text-ink/85">No shared fares yet.</p>
+          ) : (
+            <>
+              <Trend values={o.daily.map((d) => d.sharedKes)} label="Cost shared per day over 14 days" height={64} />
+              <p className="mt-1 hidden text-xs text-ink/85 sm:block">KES {o.paidKes.toLocaleString('en-KE')} paid to drivers · KES {owed.toLocaleString('en-KE')} still owed. RideMate does not hold the money.</p>
+            </>
+          )}
+        </Tile>
+
+        <Tile title="Top destinations" className="col-span-2 hidden sm:block">
+          {o.topPlaces.length === 0 ? (
+            <p className="text-sm text-ink/85">No completed rides yet.</p>
+          ) : (
+            <ol className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+              {o.topPlaces.map((r, i) => (
+                <li key={r.place} className="flex items-center justify-between gap-2">
+                  <span className="truncate">{i + 1}. {r.place}</span>
+                  <span className="shrink-0 font-medium">{r.trips} ride{r.trips === 1 ? '' : 's'}</span>
                 </li>
               ))}
             </ol>
           )}
-        </Panel>
+        </Tile>
       </div>
     </div>
   )

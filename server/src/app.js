@@ -36,6 +36,7 @@ function createApp({ verifyIdToken, markEmailVerified, config = defaultConfig } 
   app.use('/api/driver/verification', verificationRoutes.driver); // before /api/driver: unverified people must reach it
   app.use('/api/driver', driverRoutes.driver);
   app.use('/api/offers', driverRoutes.offers);
+  app.use('/api/rides', require('./routes/messages')); // driver and rider messages, before the other ride routes
   app.use('/api/rides', driverRoutes.rides);
   app.use('/api/ride-shares', driverRoutes.shares);
   app.use('/api/rides', require('./routes/rides'));

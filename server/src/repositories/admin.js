@@ -155,4 +155,51 @@ async function saveSetting(db, key, value, userId) {
   );
 }
 
-module.exports = { dashboard, stats, listUsers, setUserStatus, listAudit, listSettings, saveSetting, MATCH_SETTINGS };
+/** The console's front page: Ride Now figures, plus a 14-day series and how requests ended. */
+async function overview(db = pool) {
+  const { rows } = await db.query(`
+    SELECT (SELECT count(*)::int FROM users WHERE role = 'student' AND is_verified) AS verified_students,
+           (SELECT count(*)::int FROM driver_verifications WHERE status = 'approved') AS approved_drivers,
+           (SELECT count(*)::int FROM driver_status WHERE is_online AND last_seen_at > now() - interval '2 minutes') AS online_now,
+           (SELECT count(*)::int FROM driver_verifications WHERE status = 'pending_review' OR recheck_state = 'submitted') AS pending_verifications,
+           (SELECT count(*)::int FROM incident_reports WHERE status <> 'closed') AS open_incidents,
+           (SELECT count(*)::int FROM rides WHERE status NOT IN ('completed', 'cancelled')) AS active_rides,
+           (SELECT count(*)::int FROM rides WHERE status = 'completed') AS rides_completed,
+           (SELECT count(*)::int FROM rides r WHERE r.status = 'completed' AND (SELECT count(*) FROM ride_shares s WHERE s.ride_id = r.ride_id) > 1) AS pooled,
+           (SELECT COALESCE(sum(s.amount_kes), 0)::int FROM ride_shares s JOIN rides r ON r.ride_id = s.ride_id WHERE r.status = 'completed') AS shared_kes,
+           (SELECT COALESCE(sum(s.amount_kes) FILTER (WHERE s.status = 'paid'), 0)::int FROM ride_shares s JOIN rides r ON r.ride_id = s.ride_id WHERE r.status = 'completed') AS paid_kes,
+           (SELECT COALESCE(round(avg(stars), 2), 0)::float FROM ratings) AS avg_rating`);
+  const { rows: daily } = await db.query(`
+    SELECT to_char(d, 'YYYY-MM-DD') AS day, count(DISTINCT r.ride_id)::int AS rides, COALESCE(sum(s.amount_kes), 0)::int AS shared_kes
+      FROM generate_series(current_date - 13, current_date, interval '1 day') d
+      LEFT JOIN rides r ON r.status = 'completed' AND r.completed_at::date = d::date
+      LEFT JOIN ride_shares s ON s.ride_id = r.ride_id
+     GROUP BY d ORDER BY d`);
+  const { rows: outcomes } = await db.query(`
+    SELECT count(*) FILTER (WHERE status = 'completed')::int AS completed,
+           count(*) FILTER (WHERE status = 'cancelled')::int AS cancelled,
+           count(*) FILTER (WHERE status = 'no_driver')::int AS no_driver
+      FROM trip_requests WHERE created_at > now() - interval '30 days'`);
+  const { rows: places } = await db.query(`
+    SELECT dropoff_label AS place, count(*)::int AS trips FROM trip_requests WHERE status = 'completed'
+     GROUP BY 1 ORDER BY trips DESC, 1 LIMIT 5`);
+  const r = rows[0];
+  return {
+    verifiedStudents: r.verified_students,
+    approvedDrivers: r.approved_drivers,
+    onlineNow: r.online_now,
+    pendingVerifications: r.pending_verifications,
+    openIncidents: r.open_incidents,
+    activeRides: r.active_rides,
+    ridesCompleted: r.rides_completed,
+    pooledRides: r.pooled,
+    sharedKes: r.shared_kes,
+    paidKes: r.paid_kes,
+    avgRating: r.avg_rating,
+    daily: daily.map((x) => ({ day: x.day, rides: x.rides, sharedKes: x.shared_kes })),
+    outcomes: outcomes[0],
+    topPlaces: places,
+  };
+}
+
+module.exports = { overview, dashboard, stats, listUsers, setUserStatus, listAudit, listSettings, saveSetting, MATCH_SETTINGS };

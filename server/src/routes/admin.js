@@ -22,6 +22,8 @@ async function loadDashboard(query) {
   return admin.dashboard({ from: dateParam(query.from), to: dateParam(query.to), fuelRate: settings.fuelRateKesPerKm });
 }
 
+router.get('/overview', async (req, res) => res.json({ overview: await admin.overview() }));
+
 router.get('/stats', async (req, res) => {
   res.json({ stats: { ...(await admin.stats()), ...(await loadDashboard(req.query)) } });
 });

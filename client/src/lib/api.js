@@ -183,6 +183,10 @@ export const api = {
   acceptOffer: (id) => request(`/offers/${id}/accept`, { method: 'POST' }),
   declineOffer: (id) => request(`/offers/${id}/decline`, { method: 'POST' }),
   rideLive: (rideId) => request(`/rides/${rideId}/live`),
+  // Messages between a driver and a rider (a driver names the rider; a rider's thread is implied)
+  rideMessages: (rideId, riderId, markRead = false) => request(`/rides/${rideId}/messages${qs({ riderId, read: markRead ? 1 : undefined })}`),
+  sendRideMessage: (rideId, body, riderId) => request(`/rides/${rideId}/messages`, { method: 'POST', body: { body, ...(riderId ? { riderId } : {}) } }),
+  rideUnread: (rideId) => request(`/rides/${rideId}/messages/unread`),
   stopStep: (rideId, stopId, step) => request(`/rides/${rideId}/stops/${stopId}/${step}`, { method: 'POST' }),
   completeRide: (rideId) => request(`/rides/${rideId}/complete`, { method: 'POST' }),
   rateRide: (rideId, body) => request(`/rides/${rideId}/ratings`, { method: 'POST', body }),
@@ -217,6 +221,7 @@ export const api = {
 
   // Admin
   adminPayments: () => request('/admin/payments'),
+  adminOverview: () => request('/admin/overview'),
   adminDashboard: (range = {}) => request(`/admin/stats${qs(range)}`),
   adminDownloadCsv: (range = {}) => download(`/admin/stats.csv${qs(range)}`, 'ridemate-stats.csv'),
   adminIncidents: (status) => request(`/admin/incidents${qs({ status })}`),

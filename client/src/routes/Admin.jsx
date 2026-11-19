@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router'
-import { ShieldCheck } from 'lucide-react'
+import { EllipsisVertical, ShieldCheck } from 'lucide-react'
 import { Analytics, Dashboard, Incidents } from './AdminSections.jsx'
 import { Verification } from './AdminVerification.jsx'
 import { DispatchTools, LiveOps, Zones } from './AdminDispatch.jsx'
@@ -27,6 +27,55 @@ const TABS = [
   { id: 'settings', label: 'Matching settings' },
 ]
 
+const PHONE_TABS = 3 // tabs kept in the bar on a phone; the rest are in the three-dot menu
+
+/** Phones: a few key tabs, the current one, and a three-dot menu for everything else. */
+function PhoneTabs({ tab, go }) {
+  const [open, setOpen] = useState(false)
+  const box = useRef(null)
+  useEffect(() => {
+    if (!open) return undefined
+    const close = (e) => {
+      if (e.type === 'keydown' ? e.key === 'Escape' : !box.current?.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', close)
+    return () => {
+      document.removeEventListener('mousedown', close)
+      document.removeEventListener('keydown', close)
+    }
+  }, [open])
+  const front = TABS.slice(0, PHONE_TABS)
+  const current = TABS.find((t) => t.id === tab)
+  const shown = front.some((t) => t.id === tab) ? front : [...front, current]
+  const rest = TABS.filter((t) => !shown.some((s) => s.id === t.id))
+  return (
+    <div className="flex items-center gap-1.5 md:hidden">
+      <nav aria-label="Admin sections" className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto">
+        {shown.map((t) => (
+          <button key={t.id} type="button" aria-current={tab === t.id ? 'page' : undefined} onClick={() => go(t.id)} className={`focus-ring min-h-10 shrink-0 rounded-full px-3.5 text-[13px] font-medium whitespace-nowrap ${tab === t.id ? 'bg-ink text-gold' : 'bg-paper-deep text-ink'}`}>
+            {t.label}
+          </button>
+        ))}
+      </nav>
+      <div ref={box} className="relative shrink-0">
+        <button type="button" aria-label="More sections" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="focus-ring flex size-10 items-center justify-center rounded-full bg-paper-deep text-ink">
+          <EllipsisVertical size={20} aria-hidden />
+        </button>
+        {open && (
+          <div role="menu" className="absolute top-full right-0 z-40 mt-1 w-56 max-w-[calc(100vw-1.5rem)] rounded-(--radius-panel) border border-ink/20 bg-surface p-1.5 shadow-xl">
+            {rest.map((t) => (
+              <button key={t.id} type="button" role="menuitem" onClick={() => { setOpen(false); go(t.id) }} className="focus-ring flex min-h-11 w-full items-center rounded-(--radius-control) px-3 text-left text-sm font-medium text-ink hover:bg-ink/8">
+                {t.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function Admin() {
   const { profile } = useAuth()
   const [params, setParams] = useSearchParams()
@@ -35,14 +84,15 @@ export default function Admin() {
   const go = (id) => setParams({ tab: id })
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3 md:space-y-6">
       <div>
-        <p className="text-xs font-medium tracking-wider text-ink/85 uppercase">Admin console</p>
-        <PageTitle>{TABS.find((t) => t.id === tab).label}</PageTitle>
-        <p className="mt-1 text-sm break-all text-ink/85">Signed in as {profile.universityEmail}</p>
+        <p className="text-[11px] font-medium tracking-wider text-ink/85 uppercase md:text-xs">Admin console</p>
+        <PageTitle className="mb-0! text-4xl! md:text-5xl!">{TABS.find((t) => t.id === tab).label}</PageTitle>
+        <p className="mt-1 hidden text-sm break-all text-ink/85 md:block">Signed in as {profile.universityEmail}</p>
       </div>
-      <div className="grid gap-6 md:grid-cols-[13rem_minmax(0,1fr)]">
-        <nav aria-label="Admin sections" className="-mx-3 flex gap-1 overflow-x-auto px-3 pb-1 md:mx-0 md:flex-col md:overflow-visible md:px-0">
+      <PhoneTabs tab={tab} go={go} />
+      <div className="grid gap-3 md:grid-cols-[13rem_minmax(0,1fr)] md:gap-6">
+        <nav aria-label="Admin sections" className="hidden md:flex md:flex-col md:gap-1">
           {TABS.map((t) => (
             <button
               key={t.id}
@@ -56,7 +106,7 @@ export default function Admin() {
           ))}
         </nav>
         <div className="min-w-0">
-          {tab === 'dashboard' && <Dashboard />}
+          {tab === 'dashboard' && <Dashboard go={go} />}
           {tab === 'users' && <People myId={profile.userId} />}
           {tab === 'verification' && <Verification />}
           {tab === 'live' && <LiveOps />}

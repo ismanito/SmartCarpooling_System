@@ -315,6 +315,7 @@ async function liveView({ rideId, userId }) {
         lat: isDriver || mine ? s.lat : undefined,
         lng: isDriver || mine ? s.lng : undefined,
         requestId: isDriver ? s.request_id : undefined,
+        riderId: isDriver ? who?.user_id : undefined,
         riderConfirmed: isDriver && s.kind === 'pickup' ? Boolean(reqById.get(s.request_id)?.rider_confirmed_driver_at) : undefined,
         riderName: isDriver ? who?.full_name : undefined,
         riderPhone: isDriver ? who?.phone_number : undefined,

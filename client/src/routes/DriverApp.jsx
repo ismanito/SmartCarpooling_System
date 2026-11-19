@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
-import { ArrowLeft, Car, Navigation, Phone, ShieldCheck, Star } from 'lucide-react'
+import { ArrowLeft, Car, Navigation, Phone, ShieldCheck, Star, Volume2, VolumeX } from 'lucide-react'
 import { Button } from '../components/ui/Button.jsx'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog.jsx'
 import { Alert } from '../components/ui/Panel.jsx'
@@ -10,6 +10,8 @@ import { Avatar, MapStage, Sheet, Stars, kes, useNow } from '../components/ride/
 import { useLive } from '../hooks/useLive.js'
 import { api } from '../lib/api.js'
 import { LiveSelfie } from '../components/verification/LiveSelfie.jsx'
+import { MessageButton } from '../components/ride/ChatSheet.jsx'
+import { audioReady, isMuted, playRequest, setMuted, startRinging, stopRinging, unlockAudio } from '../lib/sound.js'
 
 const SEND_MS = 6000
 const DEMO_TOOLS = import.meta.env.VITE_DEMO_TOOLS === 'true'
@@ -21,24 +23,26 @@ const DEMO_SPOTS = {
 }
 const TAGS = ['On time', 'Friendly', 'Easy pick-up']
 
-/** A short two-tone beep for a new request. Browsers allow it because the driver tapped GO ONLINE first. */
-function beep() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)()
-    ;[880, 1175].forEach((freq, i) => {
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.frequency.value = freq
-      gain.gain.value = 0.15
-      osc.connect(gain).connect(ctx.destination)
-      osc.start(ctx.currentTime + i * 0.2)
-      osc.stop(ctx.currentTime + i * 0.2 + 0.15)
-    })
-    setTimeout(() => ctx.close(), 800)
-  } catch {
-    /* no sound available */
-  }
-  navigator.vibrate?.([200, 100, 200])
+/** Sound on or off, with a test button. Browsers need a tap before they allow sound, so this also wakes the audio. */
+function SoundToggle() {
+  const [muted, setM] = useState(isMuted())
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-(--radius-control) bg-paper px-3 py-2 text-sm text-ink">
+      <span className="flex items-center gap-2">
+        {muted ? <VolumeX size={16} aria-hidden /> : <Volume2 size={16} aria-hidden />} Request sound {muted ? 'off' : 'on'}
+      </span>
+      <span className="flex gap-3">
+        {!muted && (
+          <button type="button" className="focus-ring min-h-9 underline underline-offset-4" onClick={() => { unlockAudio(); playRequest() }}>
+            Test
+          </button>
+        )}
+        <button type="button" className="focus-ring min-h-9 underline underline-offset-4" onClick={() => { unlockAudio(); setMuted(!muted); setM(!muted) }}>
+          {muted ? 'Turn on' : 'Mute'}
+        </button>
+      </span>
+    </div>
+  )
 }
 
 function currentPosition() {
@@ -100,14 +104,25 @@ function Driving() {
 
   const gpsError = useShareLocation(Boolean(st?.isOnline), demoSpot)
 
-  // A new offer: sound and vibration, once.
-  const lastOffer = useRef(null)
+  // A request rings (and vibrates) until it is answered, declined or runs out. Any tap wakes the audio first.
   useEffect(() => {
-    if (st?.offer && st.offer.offerId !== lastOffer.current) {
-      lastOffer.current = st.offer.offerId
-      beep()
+    document.addEventListener('pointerdown', unlockAudio)
+    return () => {
+      document.removeEventListener('pointerdown', unlockAudio)
+      stopRinging()
     }
-  }, [st?.offer])
+  }, [])
+  const offerId = st?.offer?.offerId
+  useEffect(() => {
+    if (offerId) startRinging()
+    else stopRinging()
+  }, [offerId])
+  const [soundBlocked, setSoundBlocked] = useState(false)
+  useEffect(() => {
+    if (!offerId) return undefined
+    const t = setTimeout(() => setSoundBlocked(!isMuted() && !audioReady()), 600)
+    return () => clearTimeout(t)
+  }, [offerId])
 
   const act = async (fn) => {
     setBusy(true)
@@ -176,6 +191,11 @@ function Driving() {
           </div>
         )}
 
+        {st.offer && soundBlocked && (
+          <button type="button" onClick={() => { unlockAudio(); setSoundBlocked(false); startRinging() }} className="focus-ring w-full rounded-(--radius-control) bg-gold px-3 py-2 text-sm font-medium text-asphalt">
+            Tap here to turn on the request sound
+          </button>
+        )}
         {st.offer ? (
           <OfferCard offer={st.offer} busy={busy} onAccept={() => act(() => api.acceptOffer(st.offer.offerId))} onDecline={() => act(() => api.declineOffer(st.offer.offerId))} />
         ) : st.ride ? (
@@ -214,6 +234,7 @@ function Driving() {
                 <Button fullWidth variant="secondary" className="h-14!" isLoading={busy} onClick={() => act(() => api.goOffline())}>GO OFFLINE</Button>
               </>
             )}
+            <SoundToggle />
             <p className="text-xs text-ink/85">RideMate is for students who are already making the journey to share the cost. It is not a taxi service.</p>
           </Sheet>
         )}
@@ -352,9 +373,10 @@ function ActiveRide({ st, act, onComplete, busy }) {
             </p>
             {i === 0 && (
               <div className="mt-3 space-y-2">
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <Button to={`https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}&travelmode=driving`} target="_blank" rel="noreferrer" size="sm"><Navigation size={16} aria-hidden /> Navigate</Button>
                   {s.riderPhone ? <Button to={`tel:${s.riderPhone}`} variant="secondary" size="sm"><Phone size={16} aria-hidden /> Call</Button> : <span />}
+                  <MessageButton rideId={rideId} riderId={s.riderId} name={s.riderName?.split(' ')[0] || 'Rider'} isDriver label="Chat" />
                 </div>
                 {s.kind === 'pickup' ? (
                   !s.arrivedAt ? (
