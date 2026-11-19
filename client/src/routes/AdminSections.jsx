@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { BarChart } from '../components/charts/Charts.jsx'
 import { Download, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { Button } from '../components/ui/Button.jsx'
 import { SelectField, TextField } from '../components/ui/Field.jsx'
@@ -27,21 +28,8 @@ function useLoad(load, deps) {
 
 /** Rides per week as bars. A table sits behind it for screen readers. */
 function WeeklyChart({ weeks }) {
-  const max = Math.max(1, ...weeks.map((w) => w.rides))
   if (weeks.length === 0) return <p className="text-sm text-ink/85">No finished rides in the last 8 weeks.</p>
-  return (
-    <figure>
-      <div role="img" aria-label={`Rides per week: ${weeks.map((w) => `${WEEK.format(new Date(w.week))} ${w.rides}`).join(', ')}`} className="flex h-40 items-end gap-2">
-        {weeks.map((w) => (
-          <div key={w.week} className="flex h-full min-w-0 flex-1 flex-col justify-end text-center">
-            <span className="text-xs text-ink">{w.rides}</span>
-            <span className="block rounded-t bg-ink" style={{ height: `${(w.rides / max) * 100}%`, minHeight: 4 }} />
-            <span className="mt-1 truncate text-[11px] text-ink/85">{WEEK.format(new Date(w.week))}</span>
-          </div>
-        ))}
-      </div>
-    </figure>
-  )
+  return <BarChart data={weeks.map((w) => ({ label: WEEK.format(new Date(w.week)), value: w.rides }))} height={120} label="Rides per week" />
 }
 
 function Integrity({ chain }) {

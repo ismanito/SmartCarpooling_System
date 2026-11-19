@@ -157,12 +157,22 @@ async function dashboard(userId) {
     [userId],
   );
   const { rows: online } = await pool.query('SELECT is_online, active_ride_id FROM driver_status WHERE driver_id = $1', [userId]);
+  // The last 7 days, one entry per day (zeros included), for the progress chart.
+  const { rows: daily } = await pool.query(
+    `SELECT to_char(d, 'YYYY-MM-DD') AS day, count(DISTINCT r.ride_id)::int AS rides, COALESCE(sum(s.amount_kes), 0)::int AS shared_kes
+       FROM generate_series(current_date - 6, current_date, interval '1 day') d
+       LEFT JOIN rides r ON r.driver_id = $1 AND r.status = 'completed' AND r.completed_at::date = d::date
+       LEFT JOIN ride_shares s ON s.ride_id = r.ride_id
+      GROUP BY d ORDER BY d`,
+    [userId],
+  );
   const h = await history(userId);
   const w = week[0];
   return {
     week: { rides: w.rides, riders: w.riders, sharedKes: w.shared_kes, paidKes: w.paid_kes, pendingKes: w.pending_kes },
     rating: { average: Number(rating[0].avg_rating), count: rating[0].n },
     answers: answers[0],
+    daily: daily.map((x) => ({ day: x.day, rides: x.rides, sharedKes: x.shared_kes })),
     isOnline: Boolean(online[0]?.is_online),
     onARide: Boolean(online[0]?.active_ride_id),
     toCollect: collect.map((c) => ({ shareId: c.share_id, amountKes: c.amount_kes, rideId: c.ride_id, riderName: c.rider_name, at: c.completed_at, dropoff: c.dropoff })),

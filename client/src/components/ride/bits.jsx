@@ -43,7 +43,7 @@ export function Sheet({ children, className = '' }) {
 
 /** Full-screen map area: the map fills it and sheets float on top. */
 export function MapStage({ children }) {
-  return <div className="relative -mx-4 -mt-6 h-[calc(100dvh-8.25rem)] min-h-[32rem] overflow-hidden md:mx-0 md:mt-0 md:rounded-(--radius-panel) md:border md:border-ink/20">{children}</div>
+  return <div className="relative -mx-3 -mt-3 -mb-3 h-[calc(100dvh-6.25rem)] min-h-[28rem] overflow-hidden md:mx-0 md:mt-0 md:mb-0 md:h-[calc(100dvh-9rem)] md:rounded-(--radius-panel) md:border md:border-ink/20">{children}</div>
 }
 
 /** Minutes from now until an ISO time (never negative). */

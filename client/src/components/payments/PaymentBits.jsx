@@ -15,16 +15,16 @@ export function StatTile({ label, value, note, tone = 'plain' }) {
     good: 'border-mint bg-surface',
   }
   return (
-    <div className={`rounded-(--radius-panel) border p-4 ${tones[tone]}`}>
-      <dt className="text-sm text-ink/85">{label}</dt>
-      <dd className="font-display text-4xl leading-none font-semibold text-ink-deep">{value}</dd>
+    <div className={`min-w-0 rounded-(--radius-panel) border p-3 sm:p-4 ${tones[tone]}`}>
+      <dt className="truncate text-xs text-ink/85 sm:text-sm">{label}</dt>
+      <dd className="truncate font-display text-3xl leading-none font-semibold text-ink-deep sm:text-4xl">{value}</dd>
       {note && <p className="mt-1 text-xs text-ink/85">{note}</p>}
     </div>
   )
 }
 
 export function StatGrid({ children }) {
-  return <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">{children}</dl>
+  return <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4">{children}</dl>
 }
 
 const CHIP = {

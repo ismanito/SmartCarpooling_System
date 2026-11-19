@@ -42,7 +42,7 @@ export default function Admin() {
         <p className="mt-1 text-sm break-all text-ink/85">Signed in as {profile.universityEmail}</p>
       </div>
       <div className="grid gap-6 md:grid-cols-[13rem_minmax(0,1fr)]">
-        <nav aria-label="Admin sections" className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-1 md:mx-0 md:flex-col md:overflow-visible md:px-0">
+        <nav aria-label="Admin sections" className="-mx-3 flex gap-1 overflow-x-auto px-3 pb-1 md:mx-0 md:flex-col md:overflow-visible md:px-0">
           {TABS.map((t) => (
             <button
               key={t.id}
