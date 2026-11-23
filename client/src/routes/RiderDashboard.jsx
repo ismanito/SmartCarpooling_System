@@ -23,8 +23,16 @@ function weekly(rides) {
   const starts = Array.from({ length: WEEKS }, (_, i) => new Date(monday.getTime() - (WEEKS - 1 - i) * 7 * 86_400_000))
   return starts.map((start, i) => {
     const end = i === WEEKS - 1 ? Infinity : starts[i + 1].getTime()
-    const inWeek = rides.filter((r) => r.status === 'completed' && new Date(r.at) >= start && new Date(r.at) < end)
-    return { label: SHORT.format(start), rides: inWeek.length, kes: inWeek.reduce((s, r) => s + (r.shareKes || 0), 0) }
+    const all = rides.filter((r) => new Date(r.at) >= start && new Date(r.at) < end)
+    const inWeek = all.filter((r) => r.status === 'completed')
+    return {
+      label: SHORT.format(start),
+      rides: inWeek.length,
+      cancelled: all.filter((r) => r.status === 'cancelled').length,
+      none: all.filter((r) => r.status === 'no_driver').length,
+      kes: inWeek.reduce((s, r) => s + (r.shareKes || 0), 0),
+      avg: inWeek.length ? Math.round(inWeek.reduce((s, r) => s + (r.shareKes || 0), 0) / inWeek.length) : 0,
+    }
   })
 }
 
@@ -95,15 +103,15 @@ export default function RiderDashboard() {
 
       <div className="grid gap-3 md:grid-cols-2">
         <Tile
-          title={metric === 'rides' ? 'Your rides' : 'Your spending'}
+          title={metric === 'rides' ? 'Your requests' : 'Your spending'}
           aside={<Segmented label="Show" value={metric} onChange={setMetric} options={[['rides', 'Rides'], ['spent', 'Spent']]} />}
         >
           <div className="flex items-center gap-3">
             <div className="min-w-0 flex-1">
               {metric === 'rides' ? (
-                <LineChart labels={weeks.map((w) => w.label)} series={[{ name: 'Rides', values: weeks.map((w) => w.rides) }]} height={108} label="Rides per week over the last 8 weeks" />
+                <LineChart labels={weeks.map((w) => w.label)} series={[{ name: 'Completed', values: weeks.map((w) => w.rides) }, { name: 'Cancelled', values: weeks.map((w) => w.cancelled) }, { name: 'No driver', values: weeks.map((w) => w.none) }]} height={104} label="Your requests per week over the last 8 weeks" />
               ) : (
-                <LineChart labels={weeks.map((w) => w.label)} series={[{ name: 'KES', values: weeks.map((w) => w.kes) }]} height={108} format={(v) => `KES ${v}`} label="What you paid per week over the last 8 weeks" />
+                <LineChart labels={weeks.map((w) => w.label)} series={[{ name: 'Spent', values: weeks.map((w) => w.kes) }, { name: 'Per ride', values: weeks.map((w) => w.avg) }]} height={104} format={(v) => `KES ${v}`} label="What you paid per week over the last 8 weeks" />
               )}
             </div>
             {paidPct !== null && (

@@ -87,7 +87,7 @@ export function Tile({ title, aside, children, className = '' }) {
 // ---------------------------------------------------------------- line charts
 
 const W = 320
-const PAD = { left: 34, right: 10, top: 10, bottom: 22 }
+const PAD = { left: 30, right: 12, top: 12, bottom: 22 }
 
 /** A smooth curve through the points that never overshoots them. */
 function smooth(pts) {
@@ -111,21 +111,24 @@ function smooth(pts) {
   return d
 }
 
-/** A round top for the axis: 1, 2, 5 or 10 times a power of ten. */
-function niceMax(v) {
-  if (v <= 0) return 1
-  const p = 10 ** Math.floor(Math.log10(v))
-  const f = v / p
-  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p
+/** Axis ticks with round steps (1, 2, 2.5, 5, 10 times a power of ten), about four of them, from zero. */
+function scale(max) {
+  if (max <= 4) return { step: 1, top: Math.max(1, Math.ceil(max)) }
+  const raw = max / 4
+  const p = 10 ** Math.floor(Math.log10(raw))
+  const f = raw / p
+  const step = (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p
+  return { step, top: step * Math.ceil(max / step) }
 }
 
-const COLORS = ['var(--color-ink)', 'var(--color-coral)']
+// Navy, teal and orange, so up to three lines are easy to tell apart.
+export const LINE_COLORS = ['#2f2b7c', '#0aa89c', '#d9803f']
 
 /**
- * A line chart for a trend over time, with a faint area under the first line, gridlines, and a readout that follows
- * a finger or the mouse. `series` has one or two lines: [{ name, values }]. `labels` has one label per point.
+ * A line chart for trends: smooth coloured lines with a dot on every point, light gridlines, date labels, a legend
+ * and a readout that follows a finger or the mouse. `series` is up to three lines: [{ name, values }].
  */
-export function LineChart({ labels, series, height = 150, format = (v) => v, axisFormat = (v) => v, label }) {
+export function LineChart({ labels, series, height = 150, format = (v) => v, axisFormat = (v) => v, label, legend = true }) {
   const id = useId()
   const box = useRef(null)
   const [hover, setHover] = useState(null)
@@ -133,11 +136,14 @@ export function LineChart({ labels, series, height = 150, format = (v) => v, axi
   const H = height
   const innerW = W - PAD.left - PAD.right
   const innerH = H - PAD.top - PAD.bottom
-  const top = niceMax(Math.max(0, ...series.flatMap((s) => s.values)))
+  const { step, top } = scale(Math.max(0, ...series.flatMap((s) => s.values)))
   const x = (i) => PAD.left + (n <= 1 ? innerW / 2 : (i / (n - 1)) * innerW)
   const y = (v) => PAD.top + innerH - (v / top) * innerH
   const lines = series.map((s) => s.values.map((v, i) => [x(i), y(v)]))
-  const gridValues = [0, top / 2, top]
+  const grid = []
+  for (let g = 0; g <= top + 1e-9; g += step) grid.push(g)
+  const dots = n <= 14 // a dot on every point while there are few; otherwise only the one being looked at
+
   // About six date labels, always ending on the last day, without the last two touching.
   const tickEvery = Math.max(1, Math.ceil(n / 6))
   const ticks = []
@@ -146,7 +152,6 @@ export function LineChart({ labels, series, height = 150, format = (v) => v, axi
     if (n - 1 - ticks[ticks.length - 1] >= tickEvery * 0.9) ticks.push(n - 1)
     else ticks[ticks.length - 1] = n - 1
   }
-  const best = Math.max(...series[0].values)
   const summary = `${label}. ${series.map((s) => `${s.name}: from ${format(s.values[0])} to ${format(s.values[n - 1])}, highest ${format(Math.max(...s.values))}`).join('. ')}`
 
   const move = (e) => {
@@ -156,6 +161,7 @@ export function LineChart({ labels, series, height = 150, format = (v) => v, axi
     setHover(Math.min(n - 1, Math.max(0, Math.round(((px - PAD.left) / innerW) * (n - 1)))))
   }
   const shown = hover ?? n - 1
+  const single = series.length === 1
 
   return (
     <div className="w-full">
@@ -164,8 +170,9 @@ export function LineChart({ labels, series, height = 150, format = (v) => v, axi
           {labels[shown]}
           {series.map((s, k) => (
             <span key={s.name} className="ml-2 inline-flex items-center gap-1">
-              <span aria-hidden className="inline-block size-2 rounded-full" style={{ background: COLORS[k] }} />
-              {format(s.values[shown])}{k > 0 ? ` ${s.name.toLowerCase()}` : ''}
+              <span aria-hidden className="inline-block size-2 rounded-full" style={{ background: LINE_COLORS[k] }} />
+              {format(s.values[shown])}
+              {series.length > 1 && !String(format(s.values[shown])).toLowerCase().includes(s.name.toLowerCase()) ? ` ${s.name.toLowerCase()}` : ''}
             </span>
           ))}
         </span>
@@ -183,33 +190,49 @@ export function LineChart({ labels, series, height = 150, format = (v) => v, axi
       >
         <defs>
           <linearGradient id={`${id}-fill`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="var(--color-mint)" stopOpacity="0.4" />
-            <stop offset="1" stopColor="var(--color-mint)" stopOpacity="0" />
+            <stop offset="0" stopColor={LINE_COLORS[0]} stopOpacity="0.16" />
+            <stop offset="1" stopColor={LINE_COLORS[0]} stopOpacity="0" />
           </linearGradient>
         </defs>
-        {gridValues.map((g) => (
+        {grid.map((g) => (
           <g key={g}>
-            <line x1={PAD.left} x2={W - PAD.right} y1={y(g)} y2={y(g)} stroke="var(--color-ink)" strokeOpacity={g === 0 ? 0.35 : 0.12} strokeDasharray={g === 0 ? undefined : '3 3'} />
-            <text x={PAD.left - 5} y={y(g) + 3} textAnchor="end" fontSize="9" fill="var(--color-ink)" fillOpacity="0.75">
+            <line x1={PAD.left} x2={W - PAD.right} y1={y(g)} y2={y(g)} stroke="var(--color-ink)" strokeOpacity={g === 0 ? 0.3 : 0.1} />
+            <text x={PAD.left - 6} y={y(g) + 3} textAnchor="end" fontSize="9" fontWeight="600" fill="var(--color-ink)" fillOpacity="0.8">
               {axisFormat(Math.round(g * 10) / 10)}
             </text>
           </g>
         ))}
         {ticks.map((i) => (
-          <text key={`${labels[i]}-${i}`} x={x(i)} y={H - 6} textAnchor={i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'} fontSize="9" fill="var(--color-ink)" fillOpacity="0.75">
+          <text key={`${labels[i]}-${i}`} x={x(i)} y={H - 6} textAnchor={i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'} fontSize="9" fontWeight="600" fill="var(--color-ink)" fillOpacity="0.8">
             {labels[i]}
           </text>
         ))}
-        {lines[0].length > 1 && <path d={`${smooth(lines[0])} L${x(n - 1)},${y(0)} L${x(0)},${y(0)} Z`} fill={`url(#${id}-fill)`} />}
+        {single && lines[0].length > 1 && <path d={`${smooth(lines[0])} L${x(n - 1)},${y(0)} L${x(0)},${y(0)} Z`} fill={`url(#${id}-fill)`} />}
+        {hover !== null && <line x1={x(hover)} x2={x(hover)} y1={PAD.top} y2={PAD.top + innerH} stroke="var(--color-ink)" strokeOpacity="0.25" />}
         {lines.map((pts, k) => (
-          <path key={series[k].name} d={smooth(pts)} fill="none" stroke={COLORS[k]} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray={k === 1 ? '5 4' : undefined} />
+          <path key={series[k].name} d={smooth(pts)} fill="none" stroke={LINE_COLORS[k]} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
         ))}
-        {hover !== null && <line x1={x(hover)} x2={x(hover)} y1={PAD.top} y2={PAD.top + innerH} stroke="var(--color-ink)" strokeOpacity="0.3" />}
-        {lines.map((pts, k) => (
-          <circle key={series[k].name} cx={pts[shown][0]} cy={pts[shown][1]} r="4" fill="var(--color-surface)" stroke={COLORS[k]} strokeWidth="2.2" />
-        ))}
-        {n > 0 && best === 0 && <text x={W / 2} y={H / 2} textAnchor="middle" fontSize="11" fill="var(--color-ink)" fillOpacity="0.7">No data in this period yet</text>}
+        {lines.map((pts, k) =>
+          pts.map(([px, py], i) =>
+            dots || i === shown ? <circle key={`${series[k].name}-${i}`} cx={px} cy={py} r={i === shown ? 4.2 : 3.2} fill={LINE_COLORS[k]} stroke={i === shown ? 'var(--color-surface)' : 'none'} strokeWidth="1.6" /> : null,
+          ),
+        )}
+        {n > 0 && Math.max(...series.flatMap((s) => s.values)) === 0 && (
+          <text x={W / 2} y={H / 2} textAnchor="middle" fontSize="11" fill="var(--color-ink)" fillOpacity="0.7">
+            No data in this period yet
+          </text>
+        )}
       </svg>
+      {legend && series.length > 1 && (
+        <ul className="mt-1 flex flex-wrap justify-center gap-x-4 gap-y-1">
+          {series.map((s, k) => (
+            <li key={s.name} className="flex items-center gap-1.5 text-[11px] font-bold tracking-wide text-ink-deep uppercase">
+              <span aria-hidden className="inline-block size-3" style={{ background: LINE_COLORS[k] }} />
+              {s.name}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

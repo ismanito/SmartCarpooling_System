@@ -28,7 +28,7 @@ function Dashboard() {
   const { data: vehicles } = useLive(useCallback(() => api.listVehicles().then((r) => r.vehicles), []), { pollMs: 60000 })
   const [problem, setProblem] = useState(null)
   const [metric, setMetric] = useState('kes')
-  const [range, setRange] = useState(30)
+  const [range, setRange] = useState(7)
 
   const settle = async (shareId) => {
     setProblem(null)
@@ -87,10 +87,10 @@ function Dashboard() {
 
       <div className="grid min-w-0 gap-3 md:grid-cols-2">
         <Tile
-          title={metric === 'kes' ? 'Cost shared' : 'Rides'}
+          title={metric === 'kes' ? 'Cost shared' : 'Activity'}
           aside={
             <span className="flex flex-wrap items-center justify-end gap-1.5">
-              <Segmented label="Show" value={metric} onChange={setMetric} options={[['kes', 'KES'], ['rides', 'Rides']]} />
+              <Segmented label="Show" value={metric} onChange={setMetric} options={[['kes', 'KES'], ['rides', 'Activity']]} />
               <Segmented label="Period" value={range} onChange={setRange} options={[[7, '7d'], [30, '30d']]} />
             </span>
           }
@@ -98,9 +98,9 @@ function Dashboard() {
           <div className="flex items-center gap-3">
             <div className="min-w-0 flex-1">
               {metric === 'kes' ? (
-                <LineChart labels={recent.map(dayLabel)} series={[{ name: 'KES', values: recent.map((d) => d.sharedKes) }, { name: '7-day average', values: movingAverage((data.daily || []).map((d) => d.sharedKes)).slice(-range) }]} height={104} format={(v) => `KES ${v}`} axisFormat={(v) => v} label={`Cost shared per day, last ${range} days`} />
+                <LineChart labels={recent.map(dayLabel)} series={[{ name: 'KES', values: recent.map((d) => d.sharedKes) }, { name: '7-day average', values: movingAverage((data.daily || []).map((d) => d.sharedKes)).slice(-range) }]} height={90} format={(v) => `KES ${v}`} axisFormat={(v) => v} label={`Cost shared per day, last ${range} days`} />
               ) : (
-                <LineChart labels={recent.map(dayLabel)} series={[{ name: 'Rides', values: recent.map((d) => d.rides) }, { name: '7-day average', values: movingAverage((data.daily || []).map((d) => d.rides)).slice(-range) }]} height={104} label={`Rides per day, last ${range} days`} />
+                <LineChart labels={recent.map(dayLabel)} series={[{ name: 'Rides', values: recent.map((d) => d.rides) }, { name: 'Riders carried', values: recent.map((d) => d.riders ?? 0) }]} height={90} label={`Rides and riders carried per day, last ${range} days`} />
               )}
             </div>
             {acceptPct !== null && (
@@ -119,8 +119,8 @@ function Dashboard() {
             <p className="text-sm text-ink/85">Nothing waiting. Riders pay you in cash or M-Pesa; RideMate takes no commission.</p>
           ) : (
             <ul className="divide-y divide-ink/10">
-              {data.toCollect.slice(0, 2).map((c) => (
-                <li key={c.shareId} className="flex min-h-11 items-center justify-between gap-2 py-1">
+              {data.toCollect.slice(0, 2).map((c, i) => (
+                <li key={c.shareId} className={`min-h-11 items-center justify-between gap-2 py-1 ${i === 1 ? 'hidden sm:flex' : 'flex'}`}>
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-medium text-ink">{c.riderName}</span>
                     <span className="block truncate text-xs text-ink/85">

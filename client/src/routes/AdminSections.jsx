@@ -53,7 +53,7 @@ const DAY_SHORT = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 's
 /** The console's front page: what is happening now, how the pilot is going, and what needs attention. */
 export function Dashboard({ go = () => {} }) {
   const [metric, setMetric] = useState('rides')
-  const [range, setRange] = useState(30)
+  const [range, setRange] = useState(14)
   const { data, error } = useLoad(() => Promise.all([api.adminOverview(), api.adminVerifyAudit()]).then(([o, chain]) => ({ o: o.overview, chain })), [])
   if (error) return <Alert tone="error">{error}</Alert>
   if (!data) return <Spinner />
@@ -109,9 +109,9 @@ export function Dashboard({ go = () => {} }) {
           {metric === 'rides' ? (
             <LineChart
               labels={labels}
-              series={[{ name: 'Rides', values: recent.map((d) => d.rides) }, { name: 'Requests', values: recent.map((d) => d.requests) }]}
-              height={140}
-              label={`Rides completed and ride requests per day, last ${range} days`}
+              series={[{ name: 'Requests', values: recent.map((d) => d.requests) }, { name: 'Rides', values: recent.map((d) => d.rides) }, { name: 'Pooled', values: recent.map((d) => d.pooled ?? 0) }]}
+              height={130}
+              label={`Requests, rides completed and pooled rides per day, last ${range} days`}
             />
           ) : (
             <LineChart labels={labels} series={[{ name: 'KES', values: recent.map((d) => d.sharedKes) }, { name: '7-day average', values: movingAverage(o.daily.map((d) => d.sharedKes)).slice(-range) }]} height={140} format={(v) => `KES ${v}`} label={`Cost shared per day, last ${range} days`} />

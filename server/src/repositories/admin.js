@@ -173,7 +173,8 @@ async function overview(db = pool) {
     SELECT to_char(d, 'YYYY-MM-DD') AS day,
            (SELECT count(*)::int FROM rides r WHERE r.status = 'completed' AND r.completed_at::date = d::date) AS rides,
            (SELECT COALESCE(sum(s.amount_kes), 0)::int FROM ride_shares s JOIN rides r ON r.ride_id = s.ride_id WHERE r.status = 'completed' AND r.completed_at::date = d::date) AS shared_kes,
-           (SELECT count(*)::int FROM trip_requests q WHERE q.created_at::date = d::date) AS requests
+           (SELECT count(*)::int FROM trip_requests q WHERE q.created_at::date = d::date) AS requests,
+           (SELECT count(*)::int FROM rides r WHERE r.status = 'completed' AND r.completed_at::date = d::date AND (SELECT count(*) FROM ride_shares s WHERE s.ride_id = r.ride_id) > 1) AS pooled
       FROM generate_series(current_date - 29, current_date, interval '1 day') d
      ORDER BY d`);
   const { rows: outcomes } = await db.query(`
@@ -197,7 +198,7 @@ async function overview(db = pool) {
     sharedKes: r.shared_kes,
     paidKes: r.paid_kes,
     avgRating: r.avg_rating,
-    daily: daily.map((x) => ({ day: x.day, rides: x.rides, sharedKes: x.shared_kes, requests: x.requests })),
+    daily: daily.map((x) => ({ day: x.day, rides: x.rides, sharedKes: x.shared_kes, requests: x.requests, pooled: x.pooled })),
     outcomes: outcomes[0],
     topPlaces: places,
   };
