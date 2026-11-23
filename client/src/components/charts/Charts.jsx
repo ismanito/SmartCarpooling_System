@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useId, useRef, useState } from 'react'
 
 /** Small, dependency-free charts that scale to their box. Colours come from the theme. */
 
@@ -82,4 +82,161 @@ export function Tile({ title, aside, children, className = '' }) {
       {children}
     </section>
   )
+}
+
+// ---------------------------------------------------------------- line charts
+
+const W = 320
+const PAD = { left: 34, right: 10, top: 10, bottom: 22 }
+
+/** A smooth curve through the points that never overshoots them. */
+function smooth(pts) {
+  const n = pts.length
+  if (n === 0) return ''
+  if (n === 1) return `M${pts[0][0]},${pts[0][1]}`
+  const dx = []
+  const slope = []
+  for (let i = 0; i < n - 1; i += 1) {
+    dx[i] = pts[i + 1][0] - pts[i][0]
+    slope[i] = (pts[i + 1][1] - pts[i][1]) / dx[i]
+  }
+  const t = [slope[0]]
+  for (let i = 1; i < n - 1; i += 1) t[i] = slope[i - 1] * slope[i] <= 0 ? 0 : 2 / (1 / slope[i - 1] + 1 / slope[i])
+  t[n - 1] = slope[n - 2]
+  let d = `M${pts[0][0]},${pts[0][1]}`
+  for (let i = 0; i < n - 1; i += 1) {
+    const h = dx[i] / 3
+    d += `C${pts[i][0] + h},${pts[i][1] + t[i] * h} ${pts[i + 1][0] - h},${pts[i + 1][1] - t[i + 1] * h} ${pts[i + 1][0]},${pts[i + 1][1]}`
+  }
+  return d
+}
+
+/** A round top for the axis: 1, 2, 5 or 10 times a power of ten. */
+function niceMax(v) {
+  if (v <= 0) return 1
+  const p = 10 ** Math.floor(Math.log10(v))
+  const f = v / p
+  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p
+}
+
+const COLORS = ['var(--color-ink)', 'var(--color-coral)']
+
+/**
+ * A line chart for a trend over time, with a faint area under the first line, gridlines, and a readout that follows
+ * a finger or the mouse. `series` has one or two lines: [{ name, values }]. `labels` has one label per point.
+ */
+export function LineChart({ labels, series, height = 150, format = (v) => v, axisFormat = (v) => v, label }) {
+  const id = useId()
+  const box = useRef(null)
+  const [hover, setHover] = useState(null)
+  const n = labels.length
+  const H = height
+  const innerW = W - PAD.left - PAD.right
+  const innerH = H - PAD.top - PAD.bottom
+  const top = niceMax(Math.max(0, ...series.flatMap((s) => s.values)))
+  const x = (i) => PAD.left + (n <= 1 ? innerW / 2 : (i / (n - 1)) * innerW)
+  const y = (v) => PAD.top + innerH - (v / top) * innerH
+  const lines = series.map((s) => s.values.map((v, i) => [x(i), y(v)]))
+  const gridValues = [0, top / 2, top]
+  // About six date labels, always ending on the last day, without the last two touching.
+  const tickEvery = Math.max(1, Math.ceil(n / 6))
+  const ticks = []
+  for (let i = 0; i < n; i += tickEvery) ticks.push(i)
+  if (n > 0 && ticks[ticks.length - 1] !== n - 1) {
+    if (n - 1 - ticks[ticks.length - 1] >= tickEvery * 0.9) ticks.push(n - 1)
+    else ticks[ticks.length - 1] = n - 1
+  }
+  const best = Math.max(...series[0].values)
+  const summary = `${label}. ${series.map((s) => `${s.name}: from ${format(s.values[0])} to ${format(s.values[n - 1])}, highest ${format(Math.max(...s.values))}`).join('. ')}`
+
+  const move = (e) => {
+    const rect = box.current?.getBoundingClientRect()
+    if (!rect || n === 0) return
+    const px = ((e.clientX - rect.left) / rect.width) * W
+    setHover(Math.min(n - 1, Math.max(0, Math.round(((px - PAD.left) / innerW) * (n - 1)))))
+  }
+  const shown = hover ?? n - 1
+
+  return (
+    <div className="w-full">
+      <div className="mb-1 flex min-h-5 flex-wrap items-center justify-between gap-x-3 text-xs text-ink">
+        <span className="font-medium" aria-live="polite">
+          {labels[shown]}
+          {series.map((s, k) => (
+            <span key={s.name} className="ml-2 inline-flex items-center gap-1">
+              <span aria-hidden className="inline-block size-2 rounded-full" style={{ background: COLORS[k] }} />
+              {format(s.values[shown])}{k > 0 ? ` ${s.name.toLowerCase()}` : ''}
+            </span>
+          ))}
+        </span>
+        <span className="text-ink/70">{hover === null ? 'latest' : ''}</span>
+      </div>
+      <svg
+        ref={box}
+        role="img"
+        aria-label={summary}
+        viewBox={`0 0 ${W} ${H}`}
+        className="block w-full touch-pan-y select-none"
+        onPointerMove={move}
+        onPointerDown={move}
+        onPointerLeave={() => setHover(null)}
+      >
+        <defs>
+          <linearGradient id={`${id}-fill`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="var(--color-mint)" stopOpacity="0.4" />
+            <stop offset="1" stopColor="var(--color-mint)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {gridValues.map((g) => (
+          <g key={g}>
+            <line x1={PAD.left} x2={W - PAD.right} y1={y(g)} y2={y(g)} stroke="var(--color-ink)" strokeOpacity={g === 0 ? 0.35 : 0.12} strokeDasharray={g === 0 ? undefined : '3 3'} />
+            <text x={PAD.left - 5} y={y(g) + 3} textAnchor="end" fontSize="9" fill="var(--color-ink)" fillOpacity="0.75">
+              {axisFormat(Math.round(g * 10) / 10)}
+            </text>
+          </g>
+        ))}
+        {ticks.map((i) => (
+          <text key={`${labels[i]}-${i}`} x={x(i)} y={H - 6} textAnchor={i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'} fontSize="9" fill="var(--color-ink)" fillOpacity="0.75">
+            {labels[i]}
+          </text>
+        ))}
+        {lines[0].length > 1 && <path d={`${smooth(lines[0])} L${x(n - 1)},${y(0)} L${x(0)},${y(0)} Z`} fill={`url(#${id}-fill)`} />}
+        {lines.map((pts, k) => (
+          <path key={series[k].name} d={smooth(pts)} fill="none" stroke={COLORS[k]} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" strokeDasharray={k === 1 ? '5 4' : undefined} />
+        ))}
+        {hover !== null && <line x1={x(hover)} x2={x(hover)} y1={PAD.top} y2={PAD.top + innerH} stroke="var(--color-ink)" strokeOpacity="0.3" />}
+        {lines.map((pts, k) => (
+          <circle key={series[k].name} cx={pts[shown][0]} cy={pts[shown][1]} r="4" fill="var(--color-surface)" stroke={COLORS[k]} strokeWidth="2.2" />
+        ))}
+        {n > 0 && best === 0 && <text x={W / 2} y={H / 2} textAnchor="middle" fontSize="11" fill="var(--color-ink)" fillOpacity="0.7">No data in this period yet</text>}
+      </svg>
+    </div>
+  )
+}
+
+/** Small pill buttons for switching what a chart shows. */
+export function Segmented({ options, value, onChange, label }) {
+  return (
+    <div role="group" aria-label={label} className="inline-flex rounded-full bg-paper-deep p-0.5">
+      {options.map(([id, text]) => (
+        <button
+          key={id}
+          type="button"
+          aria-pressed={value === id}
+          onClick={() => onChange(id)}
+          className={`focus-ring min-h-8 rounded-full px-2.5 text-xs font-medium ${value === id ? 'bg-ink text-gold' : 'text-ink'}`}
+        >
+          {text}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** The average of each value and the six before it: the trend underneath the day-to-day ups and downs. */
+export function movingAverage(values, window = 7) {
+  return values.map((_, i) => {
+    const part = values.slice(Math.max(0, i - window + 1), i + 1)
+    return Math.round((part.reduce((a, b) => a + b, 0) / part.length) * 10) / 10
+  })
 }

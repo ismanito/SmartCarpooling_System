@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { CalendarClock, ChevronRight, MapPin, ShieldCheck } from 'lucide-react'
 import { Button } from '../components/ui/Button.jsx'
@@ -6,14 +6,14 @@ import { Alert } from '../components/ui/Panel.jsx'
 import { Spinner } from '../components/ui/Spinner.jsx'
 import { kes } from '../components/ride/bits.jsx'
 import { formatWhen } from '../components/rides/RideBits.jsx'
-import { BarChart, Mini, Ring, Tile } from '../components/charts/Charts.jsx'
+import { LineChart, Mini, Ring, Segmented, Tile } from '../components/charts/Charts.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLive } from '../hooks/useLive.js'
 import { api } from '../lib/api.js'
 
 const LIVE = ['searching', 'offered', 'assigned', 'en_route', 'arrived', 'on_trip', 'in_progress']
 const SHORT = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' })
-const WEEKS = 6
+const WEEKS = 8
 
 /** Completed rides and money shared in each of the last six weeks (weeks start on Monday). */
 function weekly(rides) {
@@ -35,6 +35,7 @@ export default function RiderDashboard() {
   const requests = useLive(api.myTripRequests, { events: ['request:update'], pollMs: 15000 })
   const rides = history.data?.rides
   const weeks = useMemo(() => (rides ? weekly(rides) : []), [rides])
+  const [metric, setMetric] = useState('rides')
 
   if (!history.data || !requests.data) return history.error ? <Alert tone="error">{history.error}</Alert> : <Spinner />
   const { summary } = history.data
@@ -93,14 +94,21 @@ export default function RiderDashboard() {
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
-        <Tile title="Rides per week" aside="last 6 weeks">
+        <Tile
+          title={metric === 'rides' ? 'Your rides' : 'Your spending'}
+          aside={<Segmented label="Show" value={metric} onChange={setMetric} options={[['rides', 'Rides'], ['spent', 'Spent']]} />}
+        >
           <div className="flex items-center gap-3">
             <div className="min-w-0 flex-1">
-              <BarChart data={weeks.map((w) => ({ label: w.label, value: w.rides }))} height={92} label="Rides per week" />
+              {metric === 'rides' ? (
+                <LineChart labels={weeks.map((w) => w.label)} series={[{ name: 'Rides', values: weeks.map((w) => w.rides) }]} height={108} label="Rides per week over the last 8 weeks" />
+              ) : (
+                <LineChart labels={weeks.map((w) => w.label)} series={[{ name: 'KES', values: weeks.map((w) => w.kes) }]} height={108} format={(v) => `KES ${v}`} label="What you paid per week over the last 8 weeks" />
+              )}
             </div>
             {paidPct !== null && (
-              <div className="flex shrink-0 flex-col items-center gap-1">
-                <Ring value={paidPct} size={60} label={`${paidPct} percent of your shares are paid`}>{paidPct}%</Ring>
+              <div className="hidden shrink-0 flex-col items-center gap-1 min-[420px]:flex">
+                <Ring value={paidPct} size={56} label={`${paidPct} percent of your shares are paid`}>{paidPct}%</Ring>
                 <span className="text-[10px] leading-3 text-ink/85">paid up</span>
               </div>
             )}

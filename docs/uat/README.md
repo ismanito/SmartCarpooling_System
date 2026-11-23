@@ -42,6 +42,8 @@ Everything here is a kit. The numbers must come from real volunteers: do not fil
 
 ## Pilot (7.6): about one week
 
+**Before the real pilot, set `SEED_DEMO_HISTORY=false` on `ridemate-api` (or run `npm --prefix server run demo-history -- --remove`).** The demo accounts carry eight weeks of made-up sample rides so the dashboards show trends. They are only for demonstrations and must not count as pilot results. `pilot-figures --exclude-demo` ignores them either way.
+
 - Ask 10 to 20 students and a few drivers to use the real site for a week.
 - Afterwards run `npm --prefix server run pilot-figures -- --since 2026-11-20` (use the start date). It prints the five figures and lists safety reports. Take screenshots of the admin dashboard too.
 - **If there is no time for a pilot, tell your report writer.** 7.6 will be reworded as future work. Do not make figures up.

@@ -28,6 +28,7 @@ const SETTING_KEYS = {
   avg_speed_kmh: ['speedKmh', 25],
   fuel_rate_kes_per_km: ['fuelRate', 24],
   fare_rounding_kes: ['rounding', 10],
+  min_share_kes: ['minShare', 30], // the least any rider pays for a ride
 };
 
 async function loadSettings(db = pool) {
@@ -94,8 +95,8 @@ async function createRequest(db, { riderId, type, pickup, dropoff, seats, schedu
   }
   const km = routeKm(pickup, dropoff);
   const s = await loadSettings(db);
-  const alone = estimateShare(km, s.fuelRate, s.rounding, 2);
-  const pooled = estimateShare(km, s.fuelRate, s.rounding, 4);
+  const alone = estimateShare(km, s.fuelRate, s.rounding, 2, s.minShare);
+  const pooled = estimateShare(km, s.fuelRate, s.rounding, 4, s.minShare);
   const status = type === 'scheduled' ? 'scheduled' : 'searching';
   const { rows } = await db.query(
     `INSERT INTO trip_requests (rider_id, series_id, type, pickup_point, pickup_label, pickup_zone, dropoff_point, dropoff_label, dropoff_zone,

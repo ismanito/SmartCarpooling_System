@@ -155,7 +155,7 @@ async function saveSetting(db, key, value, userId) {
   );
 }
 
-/** The console's front page: Ride Now figures, plus a 14-day series and how requests ended. */
+/** The console's front page: Ride Now figures, plus a 30-day series and how requests ended. */
 async function overview(db = pool) {
   const { rows } = await db.query(`
     SELECT (SELECT count(*)::int FROM users WHERE role = 'student' AND is_verified) AS verified_students,
@@ -170,11 +170,12 @@ async function overview(db = pool) {
            (SELECT COALESCE(sum(s.amount_kes) FILTER (WHERE s.status = 'paid'), 0)::int FROM ride_shares s JOIN rides r ON r.ride_id = s.ride_id WHERE r.status = 'completed') AS paid_kes,
            (SELECT COALESCE(round(avg(stars), 2), 0)::float FROM ratings) AS avg_rating`);
   const { rows: daily } = await db.query(`
-    SELECT to_char(d, 'YYYY-MM-DD') AS day, count(DISTINCT r.ride_id)::int AS rides, COALESCE(sum(s.amount_kes), 0)::int AS shared_kes
-      FROM generate_series(current_date - 13, current_date, interval '1 day') d
-      LEFT JOIN rides r ON r.status = 'completed' AND r.completed_at::date = d::date
-      LEFT JOIN ride_shares s ON s.ride_id = r.ride_id
-     GROUP BY d ORDER BY d`);
+    SELECT to_char(d, 'YYYY-MM-DD') AS day,
+           (SELECT count(*)::int FROM rides r WHERE r.status = 'completed' AND r.completed_at::date = d::date) AS rides,
+           (SELECT COALESCE(sum(s.amount_kes), 0)::int FROM ride_shares s JOIN rides r ON r.ride_id = s.ride_id WHERE r.status = 'completed' AND r.completed_at::date = d::date) AS shared_kes,
+           (SELECT count(*)::int FROM trip_requests q WHERE q.created_at::date = d::date) AS requests
+      FROM generate_series(current_date - 29, current_date, interval '1 day') d
+     ORDER BY d`);
   const { rows: outcomes } = await db.query(`
     SELECT count(*) FILTER (WHERE status = 'completed')::int AS completed,
            count(*) FILTER (WHERE status = 'cancelled')::int AS cancelled,
@@ -196,7 +197,7 @@ async function overview(db = pool) {
     sharedKes: r.shared_kes,
     paidKes: r.paid_kes,
     avgRating: r.avg_rating,
-    daily: daily.map((x) => ({ day: x.day, rides: x.rides, sharedKes: x.shared_kes })),
+    daily: daily.map((x) => ({ day: x.day, rides: x.rides, sharedKes: x.shared_kes, requests: x.requests })),
     outcomes: outcomes[0],
     topPlaces: places,
   };

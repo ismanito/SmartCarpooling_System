@@ -102,7 +102,7 @@ async function done({ rideId, stopId, driverId, ip }) {
     } else {
       const s = await dispatch.loadSettings(client);
       const legs = await legsSoFar(client, rideId);
-      const fare = calculateLegFares(legs, s.fuelRate, s.rounding);
+      const fare = calculateLegFares(legs, s.fuelRate, s.rounding, s.minShare);
       share = fare.shares[request.request_id] ?? 0;
       await client.query(`UPDATE trip_requests SET status = 'completed' WHERE request_id = $1`, [request.request_id]);
       await client.query(
@@ -217,7 +217,7 @@ async function completeRide({ rideId, driverId, ip }) {
 
     const s = await dispatch.loadSettings(client);
     const legs = await legsSoFar(client, rideId);
-    const fare = calculateLegFares(legs, s.fuelRate, s.rounding);
+    const fare = calculateLegFares(legs, s.fuelRate, s.rounding, s.minShare);
     const { rows: paid } = await client.query('SELECT COALESCE(sum(amount_kes), 0)::int AS total FROM ride_shares WHERE ride_id = $1', [rideId]);
     const totalKes = Math.max(fare.totalKes, paid[0].total);
     const totalKm = Math.round(legs.reduce((n, l) => n + l.km, 0) * 100) / 100;

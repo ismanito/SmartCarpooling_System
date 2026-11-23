@@ -189,6 +189,7 @@ const LABELS = {
   avg_speed_kmh: ['Average speed for ETAs', 'km/h'],
   fuel_rate_kes_per_km: ['Fuel cost', 'KES per km'],
   fare_rounding_kes: ['Round shares to the nearest', 'KES'],
+  min_share_kes: ['Least any rider pays', 'KES'],
 }
 const RESPONSE = { accepted: 'Accepted', declined: 'Declined', expired: 'Expired', waiting: 'Waiting' }
 

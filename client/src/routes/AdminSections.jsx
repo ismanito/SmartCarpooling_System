@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BarChart, Mini, Ring, Tile, Trend } from '../components/charts/Charts.jsx'
+import { BarChart, LineChart, Mini, Ring, Segmented, Tile, movingAverage } from '../components/charts/Charts.jsx'
 import { Download, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { Button } from '../components/ui/Button.jsx'
 import { SelectField, TextField } from '../components/ui/Field.jsx'
@@ -48,20 +48,22 @@ function Integrity({ chain }) {
   )
 }
 
-const DAY_NUM = new Intl.DateTimeFormat(undefined, { day: 'numeric' })
+const DAY_SHORT = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' })
 
 /** The console's front page: what is happening now, how the pilot is going, and what needs attention. */
 export function Dashboard({ go = () => {} }) {
+  const [metric, setMetric] = useState('rides')
+  const [range, setRange] = useState(30)
   const { data, error } = useLoad(() => Promise.all([api.adminOverview(), api.adminVerifyAudit()]).then(([o, chain]) => ({ o: o.overview, chain })), [])
   if (error) return <Alert tone="error">{error}</Alert>
   if (!data) return <Spinner />
   const { o, chain } = data
   const pooledPct = o.ridesCompleted ? Math.round((o.pooledRides / o.ridesCompleted) * 100) : 0
   const owed = Math.max(0, o.sharedKes - o.paidKes)
-  const paidPct = o.sharedKes ? Math.round((o.paidKes / o.sharedKes) * 100) : 0
   const asked = o.outcomes.completed + o.outcomes.cancelled + o.outcomes.no_driver
   const donePct = asked ? Math.round((o.outcomes.completed / asked) * 100) : 0
-  const days = o.daily.map((d) => ({ label: DAY_NUM.format(new Date(`${d.day}T12:00:00`)), value: d.rides }))
+  const recent = o.daily.slice(-range)
+  const labels = recent.map((d) => DAY_SHORT.format(new Date(`${d.day}T12:00:00`)))
   const alerts = [
     o.openIncidents > 0 && { text: `${o.openIncidents} open safety report${o.openIncidents === 1 ? '' : 's'}`, tab: 'incidents', tone: 'bg-coral text-asphalt' },
     o.pendingVerifications > 0 && { text: `${o.pendingVerifications} driver${o.pendingVerifications === 1 ? '' : 's'} waiting for review`, tab: 'verification', tone: 'bg-gold text-asphalt' },
@@ -94,8 +96,26 @@ export function Dashboard({ go = () => {} }) {
       </div>
 
       <div className="grid min-w-0 grid-cols-2 gap-3">
-        <Tile title="Rides per day" aside="last 14 days" className="col-span-2">
-          <BarChart data={days} height={84} label="Rides completed per day" />
+        <Tile
+          title={metric === 'rides' ? 'Rides' : 'Cost'}
+          className="col-span-2"
+          aside={
+            <span className="flex flex-wrap items-center justify-end gap-1.5">
+              <Segmented label="Show" value={metric} onChange={setMetric} options={[['rides', 'Rides'], ['kes', 'KES']]} />
+              <Segmented label="Period" value={range} onChange={setRange} options={[[14, '14d'], [30, '30d']]} />
+            </span>
+          }
+        >
+          {metric === 'rides' ? (
+            <LineChart
+              labels={labels}
+              series={[{ name: 'Rides', values: recent.map((d) => d.rides) }, { name: 'Requests', values: recent.map((d) => d.requests) }]}
+              height={140}
+              label={`Rides completed and ride requests per day, last ${range} days`}
+            />
+          ) : (
+            <LineChart labels={labels} series={[{ name: 'KES', values: recent.map((d) => d.sharedKes) }, { name: '7-day average', values: movingAverage(o.daily.map((d) => d.sharedKes)).slice(-range) }]} height={140} format={(v) => `KES ${v}`} label={`Cost shared per day, last ${range} days`} />
+          )}
         </Tile>
 
         <Tile title="How requests ended" aside="last 30 days" className="col-span-2 sm:col-span-1">
@@ -113,17 +133,6 @@ export function Dashboard({ go = () => {} }) {
                 <li className="flex justify-between gap-2"><span>No driver found</span><strong>{o.outcomes.no_driver}</strong></li>
               </ul>
             </div>
-          )}
-        </Tile>
-
-        <Tile title="Cost shared" aside={`${paidPct}% paid`} className="hidden sm:block">
-          {o.sharedKes === 0 ? (
-            <p className="text-sm text-ink/85">No shared fares yet.</p>
-          ) : (
-            <>
-              <Trend values={o.daily.map((d) => d.sharedKes)} label="Cost shared per day over 14 days" height={64} />
-              <p className="mt-1 hidden text-xs text-ink/85 sm:block">KES {o.paidKes.toLocaleString('en-KE')} paid to drivers · KES {owed.toLocaleString('en-KE')} still owed. RideMate does not hold the money.</p>
-            </>
           )}
         </Tile>
 

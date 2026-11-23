@@ -15,7 +15,7 @@ services:
     rootDir: server
     plan: free
     buildCommand: npm ci
-    startCommand: node scripts/migrate.js && (DEMO_DB_ONLY=1 node scripts/demo-accounts.js || true) && node src/index.js
+    startCommand: node scripts/migrate.js && (DEMO_DB_ONLY=1 node scripts/demo-accounts.js || true) && (node scripts/demo-history.js || true) && node src/index.js
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
@@ -38,6 +38,8 @@ services:
         value: 'true'
       - key: FIREBASE_WEB_API_KEY
         value: 'AIzaSyCoIaEMsZ7-iWiQQA4d9evzGKcswm5kinQ' # public web key; lets the demo-account step look up Firebase users
+      - key: SEED_DEMO_HISTORY
+        value: 'true' # fills the demo accounts with 8 weeks of sample rides so the charts show trends; set to false for the real pilot
       - key: DEMO_EMAIL_DOMAINS
         value: demo.ridemate.test # demo accounts only; clear this for real use
       - key: CORS_ORIGIN

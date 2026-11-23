@@ -50,8 +50,8 @@ router.post('/estimate', validateBody(estimateSchema), async (req, res) => {
     pickupZone: pz?.name ?? null,
     dropoffZone: dz?.name ?? null,
     routeKm: km,
-    estShareKes: estimateShare(km, s.fuelRate, s.rounding, 2), // alone with the driver
-    estPooledKes: estimateShare(km, s.fuelRate, s.rounding, 4), // pooled with two other students
+    estShareKes: estimateShare(km, s.fuelRate, s.rounding, 2, s.minShare), // alone with the driver
+    estPooledKes: estimateShare(km, s.fuelRate, s.rounding, 4, s.minShare), // pooled with two other students
     driversNearby: rows[0].n,
   });
 });

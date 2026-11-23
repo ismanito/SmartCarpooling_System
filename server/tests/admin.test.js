@@ -29,7 +29,7 @@ describe('GET /api/admin/overview', () => {
     const admin = await createAdmin();
     const res = await api().get('/api/admin/overview').set(auth(admin.token)).expect(200);
     expect(res.body.overview).toMatchObject({ ridesCompleted: 0, pooledRides: 0, sharedKes: 0, onlineNow: 0, outcomes: { completed: 0 } });
-    expect(res.body.overview.daily).toHaveLength(14);
+    expect(res.body.overview.daily).toHaveLength(30);
     const student = await createStudent();
     expect((await api().get('/api/admin/overview').set(auth(student.token))).status).toBe(403);
   });

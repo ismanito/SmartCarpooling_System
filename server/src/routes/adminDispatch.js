@@ -110,6 +110,7 @@ const DISPATCH_SETTINGS = {
   avg_speed_kmh: { min: 5, max: 80 },
   fuel_rate_kes_per_km: { min: 1, max: 200 },
   fare_rounding_kes: { min: 1, max: 100 },
+  min_share_kes: { min: 0, max: 500 },
 };
 
 router.get('/dispatch-settings', async (req, res) => {

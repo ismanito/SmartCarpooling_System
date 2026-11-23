@@ -6,7 +6,7 @@ import { Alert } from '../components/ui/Panel.jsx'
 import { Spinner } from '../components/ui/Spinner.jsx'
 import { Stars, kes } from '../components/ride/bits.jsx'
 import { formatWhen } from '../components/rides/RideBits.jsx'
-import { BarChart, Mini, Ring, Tile } from '../components/charts/Charts.jsx'
+import { LineChart, Mini, Ring, Segmented, Tile, movingAverage } from '../components/charts/Charts.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLive } from '../hooks/useLive.js'
 import { api } from '../lib/api.js'
@@ -20,12 +20,15 @@ export default function DriverHome() {
 }
 
 const DAY = new Intl.DateTimeFormat(undefined, { weekday: 'short' })
+const DATE = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' })
 
 function Dashboard() {
   const { profile } = useAuth()
   const { data, error, reload } = useLive(api.driverDashboard, { events: ['ride:update', 'offer:new'], pollMs: 15000 })
   const { data: vehicles } = useLive(useCallback(() => api.listVehicles().then((r) => r.vehicles), []), { pollMs: 60000 })
   const [problem, setProblem] = useState(null)
+  const [metric, setMetric] = useState('kes')
+  const [range, setRange] = useState(30)
 
   const settle = async (shareId) => {
     setProblem(null)
@@ -40,7 +43,8 @@ function Dashboard() {
   if (!data) return error ? <Alert tone="error">{error}</Alert> : <Spinner />
   const answered = data.answers.accepted + data.answers.declined + data.answers.expired
   const acceptPct = answered > 0 ? Math.round((data.answers.accepted / answered) * 100) : null
-  const days = (data.daily || []).map((d) => ({ label: DAY.format(new Date(`${d.day}T12:00:00`)).slice(0, 3), value: d.sharedKes }))
+  const recent = (data.daily || []).slice(-range)
+  const dayLabel = (d) => (range <= 7 ? DAY.format(new Date(`${d.day}T12:00:00`)) : DATE.format(new Date(`${d.day}T12:00:00`)))
   const car = vehicles?.[0]
   return (
     <div className="mx-auto w-full max-w-4xl space-y-3">
@@ -82,14 +86,26 @@ function Dashboard() {
       </div>
 
       <div className="grid min-w-0 gap-3 md:grid-cols-2">
-        <Tile title="Cost shared" aside="last 7 days, KES">
+        <Tile
+          title={metric === 'kes' ? 'Cost shared' : 'Rides'}
+          aside={
+            <span className="flex flex-wrap items-center justify-end gap-1.5">
+              <Segmented label="Show" value={metric} onChange={setMetric} options={[['kes', 'KES'], ['rides', 'Rides']]} />
+              <Segmented label="Period" value={range} onChange={setRange} options={[[7, '7d'], [30, '30d']]} />
+            </span>
+          }
+        >
           <div className="flex items-center gap-3">
             <div className="min-w-0 flex-1">
-              <BarChart data={days} height={92} label="Cost shared per day" />
+              {metric === 'kes' ? (
+                <LineChart labels={recent.map(dayLabel)} series={[{ name: 'KES', values: recent.map((d) => d.sharedKes) }, { name: '7-day average', values: movingAverage((data.daily || []).map((d) => d.sharedKes)).slice(-range) }]} height={104} format={(v) => `KES ${v}`} axisFormat={(v) => v} label={`Cost shared per day, last ${range} days`} />
+              ) : (
+                <LineChart labels={recent.map(dayLabel)} series={[{ name: 'Rides', values: recent.map((d) => d.rides) }, { name: '7-day average', values: movingAverage((data.daily || []).map((d) => d.rides)).slice(-range) }]} height={104} label={`Rides per day, last ${range} days`} />
+              )}
             </div>
             {acceptPct !== null && (
-              <div className="flex shrink-0 flex-col items-center gap-1">
-                <Ring value={acceptPct} size={60} label={`You accepted ${acceptPct} percent of requests`}>
+              <div className="hidden shrink-0 flex-col items-center gap-1 min-[420px]:flex">
+                <Ring value={acceptPct} size={56} label={`You accepted ${acceptPct} percent of requests`}>
                   {acceptPct}%
                 </Ring>
                 <span className="text-[10px] leading-3 text-ink/85">accepted</span>
@@ -129,8 +145,8 @@ function Dashboard() {
             <p className="text-sm text-ink/85">No rides yet. Go online to take your first one.</p>
           ) : (
             <ul className="divide-y divide-ink/10">
-              {data.recent.slice(0, 2).map((r) => (
-                <li key={r.rideId}>
+              {data.recent.slice(0, 2).map((r, i) => (
+                <li key={r.rideId} className={i === 1 ? 'hidden sm:block' : ''}>
                   <Link to="/drive/history" className="focus-ring flex min-h-11 items-center justify-between gap-2 py-1">
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-medium text-ink">{r.places || 'Ride'}</span>
