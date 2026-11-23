@@ -85,6 +85,9 @@ async function main() {
       const u = await user(emailOf(base));
       if (u) riders.push(u);
     }
+    // Dan is a student who also drives, so he rides too: his rider dashboard and his driver dashboard both show trends.
+    const dan = await user(emailOf('dan.mwangi'));
+    if (dan) for (let k = 0; k < 3; k += 1) riders.push(dan);
     // Real student accounts that should show trends too. They ride more often than the sample riders, and are skipped if they do not exist.
     for (const email of REAL_RIDERS) {
       const u = await user(email);
@@ -119,12 +122,16 @@ async function main() {
         const outbound = rand() < 0.5; // leaving campus (evening) or heading to it (morning)
         const hour = outbound ? weighted([[16, 3], [17, 5], [18, 4], [19, 2], [13, 2]]) : weighted([[6, 1], [7, 5], [8, 5], [9, 2], [10, 1]]);
         const at = new Date(day.getTime() + hour * 3600_000 + Math.floor(rand() * 50) * 60_000);
+        if (at.getTime() > Date.now() - 3 * 3600_000) continue; // nothing in the future, and nothing still on the road
         const pooled = rand() < 0.1 + 0.32 * progress;
-        const first = pick(riders);
+        // A driver never rides in their own car.
+        let first;
+        do first = pick(riders);
+        while (first.user_id === driver.user_id);
         let second = null;
         if (pooled) {
           do second = pick(riders);
-          while (second.user_id === first.user_id);
+          while (second.user_id === first.user_id || second.user_id === driver.user_id);
         }
         const gate = place(pick(GATES));
         const home1 = place(weighted(HOMES));
@@ -199,6 +206,7 @@ async function main() {
         const home = place(weighted(HOMES));
         const gate = place(pick(GATES));
         const at = new Date(day.getTime() + weighted([[7, 4], [8, 4], [17, 5], [18, 3]]) * 3600_000 + Math.floor(rand() * 50) * 60_000);
+        if (at.getTime() > Date.now() - 3 * 3600_000) continue;
         const status = rand() < 0.65 - 0.3 * progress ? 'no_driver' : 'cancelled';
         const km = routeKm(gate, home);
         const { rows: req } = await db.query(
