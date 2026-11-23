@@ -31,6 +31,7 @@ const SEED_RIDERS = [
   ['Esther Wambui', 'student'], ['Farid Hassan', 'student'], ['Gladys Chebet', 'staff'], ['Hassan Abdi', 'student'],
 ];
 const DEMO_RIDERS = ['grace.wanjiru', 'kevin.omondi', 'faith.njeri'];
+const REAL_RIDERS = ['isajama@usiu.ac.ke'];
 const DEMO_DRIVERS = [['dan.mwangi', 40], ['amina.hassan', 35], ['brian.otieno', 25]];
 // Where people go (weights follow how close and popular a place is)
 const HOMES = [['roysambu', 16], ['trm', 14], ['kasarani', 12], ['zimmerman', 10], ['mirema', 9], ['safari-park', 8], ['garden-city', 7], ['githurai', 6], ['ruaraka', 5], ['westlands', 5], ['kahawa-west', 4], ['cbd', 3], ['parklands', 2]];
@@ -83,6 +84,11 @@ async function main() {
     for (const base of DEMO_RIDERS) {
       const u = await user(emailOf(base));
       if (u) riders.push(u);
+    }
+    // Real student accounts that should show trends too. They ride more often than the sample riders, and are skipped if they do not exist.
+    for (const email of REAL_RIDERS) {
+      const u = await user(email);
+      if (u) for (let k = 0; k < 3; k += 1) riders.push(u);
     }
     for (const [name] of SEED_RIDERS) riders.push(await user(emailOf(`seed.${name.toLowerCase().replace(/[^a-z]+/g, '.')}`)));
     const drivers = [];
